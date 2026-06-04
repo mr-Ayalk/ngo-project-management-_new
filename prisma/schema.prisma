@@ -1,0 +1,182 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  password      String
+  avatar        String?
+  role          String     @default("staff") // admin, manager, staff, donor
+  isActive      Boolean    @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  projects      Project[]  @relation("ProjectManager")
+  tasks         Task[]     @relation("TaskAssignee")
+  messages      Message[]  @relation("MessageSender")
+  activities    Activity[]
+  notifications Notification[]
+  payments      Payment[]  @relation("PaymentUser")
+  auditLogs     AuditLog[]
+}
+
+model Project {
+  id            String     @id @default(cuid())
+  name          String
+  description   String?
+  status        String     @default("planning") // planning, active, completed, delayed
+  startDate     DateTime
+  endDate       DateTime
+  budget        Float
+  spent         Float      @default(0)
+  progress      Int        @default(0)
+  location      String?
+  donor         String?
+  managerId     String
+  manager       User       @relation("ProjectManager", fields: [managerId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tasks         Task[]
+  beneficiaries BeneficiaryProject[]
+  documents     Document[]
+  budgets       Budget[]
+  activities    Activity[]
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  status        String     @default("todo") // todo, in_progress, completed
+  priority      String     @default("medium") // low, medium, high
+  dueDate       DateTime?
+  projectId     String
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId    String?
+  assignee      User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  activities    Activity[]
+}
+
+model Beneficiary {
+  id            String     @id @default(cuid())
+  name          String
+  email         String?
+  phone         String?
+  category      String? // children, women, families, community_members
+  status        String     @default("active") // active, follow-up, inactive
+  enrolledDate  DateTime   @default(now())
+  region        String?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  projects      BeneficiaryProject[]
+}
+
+model BeneficiaryProject {
+  id            String     @id @default(cuid())
+  beneficiaryId String
+  projectId     String
+  enrolledDate  DateTime   @default(now())
+
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([beneficiaryId, projectId])
+}
+
+model Budget {
+  id            String     @id @default(cuid())
+  projectId     String
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category      String     // personnel, equipment, travel, admin
+  allocated     Float
+  spent         Float      @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Document {
+  id            String     @id @default(cuid())
+  projectId     String
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  url           String
+  type          String? // proposal, report, contract
+  uploadedAt    DateTime   @default(now())
+}
+
+model Message {
+  id            String     @id @default(cuid())
+  content       String
+  encrypted     String? // for end-to-end encryption
+  senderId      String
+  sender        User       @relation("MessageSender", fields: [senderId], references: [id])
+  recipientId   String?
+  groupId       String?
+  isRead        Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+}
+
+model Activity {
+  id            String     @id @default(cuid())
+  action        String     // created, updated, completed, deleted
+  entity        String     // project, task, budget, document
+  entityId      String
+  description   String?
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  projectId     String?
+  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskId        String?
+  task          Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+}
+
+model Notification {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  message       String
+  type          String? // info, warning, success, error
+  isRead        Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+}
+
+model Payment {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation("PaymentUser", fields: [userId], references: [id])
+  amount        Float
+  currency      String     @default("ETB")
+  method        String     // chapa, paypal
+  status        String     @default("pending") // pending, completed, failed
+  transactionId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model AuditLog {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  action        String
+  resource      String
+  details       String?
+  ipAddress     String?
+  createdAt     DateTime   @default(now())
+}
