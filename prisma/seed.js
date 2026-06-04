@@ -379,6 +379,15 @@ async function main() {
     await prisma.activity.create({ data: a });
   }
 
+  const seedMessages = [
+    { content: 'Quarterly report draft is ready for review.', senderId: grace.id },
+    { content: 'Field visit to Kaimu confirmed for May 5.', senderId: james.id },
+    { content: 'Donor meeting scheduled — please review budget numbers.', senderId: jane.id },
+  ];
+  for (const m of seedMessages) {
+    await prisma.message.create({ data: m });
+  }
+
   console.log('Seed completed successfully!');
   console.log('Login credentials: ayalkbet@bamah.com / password123');
 }

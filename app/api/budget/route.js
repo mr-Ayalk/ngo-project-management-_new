@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, formatCurrency } from '@/lib/api-utils';
+import { json, error, parseBody, formatCurrency } from '@/lib/api-utils';
 
 export async function GET() {
   try {
@@ -42,5 +42,48 @@ export async function GET() {
   } catch (err) {
     console.error('Budget GET error:', err);
     return error('Failed to load budget data', 500);
+  }
+}
+
+export async function POST(req) {
+  try {
+    const body = await parseBody(req);
+    if (!body?.projectId || !body?.amount) return error('Project and amount are required');
+
+    const amount = parseFloat(body.amount);
+    if (isNaN(amount) || amount <= 0) return error('Invalid amount');
+
+    const project = await prisma.project.findUnique({ where: { id: body.projectId } });
+    if (!project) return error('Project not found', 404);
+
+    const newSpent = project.spent + amount;
+
+    await prisma.$transaction([
+      prisma.project.update({
+        where: { id: body.projectId },
+        data: { spent: newSpent },
+      }),
+      ...(body.category
+        ? [
+            prisma.budget.create({
+              data: {
+                projectId: body.projectId,
+                category: body.category,
+                allocated: amount,
+                spent: amount,
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    return json({
+      success: true,
+      spent: formatCurrency(newSpent),
+      message: `Added ${formatCurrency(amount)} expense to ${project.name}`,
+    });
+  } catch (err) {
+    console.error('Budget POST error:', err);
+    return error('Failed to add expense', 500);
   }
 }

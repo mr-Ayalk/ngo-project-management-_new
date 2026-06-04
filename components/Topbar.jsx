@@ -1,9 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 
-const Topbar = ({ onMenuToggle }) => {
+const Topbar = ({ onMenuToggle, onSearch }) => {
   const { theme, toggleTheme } = useTheme();
+  const [query, setQuery] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSearch?.(query);
+  };
 
   return (
     <header className="topbar">
@@ -14,13 +21,18 @@ const Topbar = ({ onMenuToggle }) => {
           <line x1="3" y1="18" x2="21" y2="18"/>
         </svg>
       </button>
-      <div className="search-wrap">
+      <form className="search-wrap" onSubmit={handleSubmit}>
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" placeholder="Search anything..."/>
-      </div>
+        <input
+          type="text"
+          placeholder="Search anything..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </form>
       <div className="topbar-right">
         <button className="theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
           {theme === 'dark' ? (
@@ -29,7 +41,7 @@ const Topbar = ({ onMenuToggle }) => {
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
           )}
         </button>
-        <button className="notif-btn">
+        <button className="notif-btn" type="button" onClick={() => alert('No new notifications')} aria-label="Notifications">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
           </svg>

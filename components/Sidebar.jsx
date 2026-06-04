@@ -117,7 +117,7 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
       <div className="sidebar-promo">
         <div className="promo-img-placeholder">🌍</div>
         <p>Empowering communities. Building a better future.</p>
-        <button>Learn More</button>
+        <button type="button" onClick={() => onPageChange('settings')}>Learn More</button>
       </div>
     </aside>
   );
