@@ -8,111 +8,106 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
+  id            String         @id @default(cuid())
+  email         String         @unique
   name          String
   password      String
   avatar        String?
-  role          String     @default("staff")
-  isActive      Boolean    @default(true)
+  role          String         @default("staff")
+  isActive      Boolean        @default(true)
   lastLogin     DateTime?
-  joinedDate    DateTime   @default(now())
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  projects      Project[]  @relation("ProjectManager")
-  tasks         Task[]     @relation("TaskAssignee")
-  messages      Message[]  @relation("MessageSender")
+  joinedDate    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   activities    Activity[]
-  notifications Notification[]
-  payments      Payment[]  @relation("PaymentUser")
   auditLogs     AuditLog[]
+  messages      Message[]      @relation("MessageSender")
+  notifications Notification[]
+  payments      Payment[]      @relation("PaymentUser")
+  projects      Project[]      @relation("ProjectManager")
+  tasks         Task[]         @relation("TaskAssignee")
 }
 
 model Organization {
-  id                    String   @id @default(cuid())
-  name                  String
-  email                 String?
-  phone                 String?
-  country               String?
-  location              String?
-  description           String?
-  totalBeneficiaries    Int      @default(0)
-  childrenCount         Int      @default(0)
-  womenFamiliesCount    Int      @default(0)
-  communityMembersCount Int      @default(0)
-  beneficiariesThisMonth Int     @default(0)
-  activePrograms        Int      @default(0)
-  completionRate        Int      @default(0)
-  updatedAt             DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  email                  String?
+  phone                  String?
+  country                String?
+  location               String?
+  description            String?
+  totalBeneficiaries     Int      @default(0)
+  childrenCount          Int      @default(0)
+  womenFamiliesCount     Int      @default(0)
+  communityMembersCount  Int      @default(0)
+  beneficiariesThisMonth Int      @default(0)
+  activePrograms         Int      @default(0)
+  completionRate         Int      @default(0)
+  updatedAt              DateTime @updatedAt
 }
 
 model Project {
-  id            String     @id @default(cuid())
-  name          String
-  description   String?
-  status        String     @default("on-track")
-  icon          String     @default("green")
-  startDate     DateTime
-  endDate       DateTime
-  budget        Float
-  spent         Float      @default(0)
-  progress      Int        @default(0)
-  location      String?
-  donor         String?
-  managerId     String
-  manager       User       @relation("ProjectManager", fields: [managerId], references: [id])
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  tasks         Task[]
-  beneficiaries BeneficiaryProject[]
-  documents     Document[]
-  budgets       Budget[]
-  activities    Activity[]
+  id             String               @id @default(cuid())
+  name           String
+  description    String?
+  status         String               @default("on-track")
+  icon           String               @default("green")
+  startDate      DateTime
+  endDate        DateTime
+  budget         Float
+  spent          Float                @default(0)
+  progress       Int                  @default(0)
+  location       String?
+  donor          String?
+  managerId      String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  activities     Activity[]
+  beneficiaries  BeneficiaryProject[]
+  budgets        Budget[]
   calendarEvents CalendarEvent[]
+  documents      Document[]
+  manager        User                 @relation("ProjectManager", fields: [managerId], references: [id])
+  tasks          Task[]
 }
 
 model Task {
-  id            String     @id @default(cuid())
-  title         String
-  description   String?
-  status        String     @default("todo")
-  priority      String     @default("medium")
-  dueDate       DateTime?
-  projectId     String
-  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assigneeId    String?
-  assignee      User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  activities    Activity[]
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      String     @default("todo")
+  priority    String     @default("medium")
+  dueDate     DateTime?
+  projectId   String
+  assigneeId  String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  activities  Activity[]
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Beneficiary {
-  id            String     @id @default(cuid())
-  name          String
-  email         String?
-  phone         String?
-  program       String?
-  category      String?
-  status        String     @default("active")
-  enrolledDate  DateTime   @default(now())
-  region        String?
-  notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  projects      BeneficiaryProject[]
+  id           String               @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  program      String?
+  category     String?
+  status       String               @default("active")
+  enrolledDate DateTime             @default(now())
+  region       String?
+  notes        String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  projects     BeneficiaryProject[]
 }
 
 model BeneficiaryProject {
-  id            String     @id @default(cuid())
+  id            String      @id @default(cuid())
   beneficiaryId String
   projectId     String
-  enrolledDate  DateTime   @default(now())
-
+  enrolledDate  DateTime    @default(now())
   beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -120,121 +115,121 @@ model BeneficiaryProject {
 }
 
 model Budget {
-  id            String     @id @default(cuid())
-  projectId     String
-  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  category      String
-  allocated     Float
-  spent         Float      @default(0)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id        String   @id @default(cuid())
+  projectId String
+  category  String
+  allocated Float
+  spent     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Document {
-  id            String     @id @default(cuid())
-  projectId     String?
-  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  name          String
-  url           String     @default("#")
-  fileType      String?
-  category      String?
-  size          String?
-  icon          String?
-  uploadedAt    DateTime   @default(now())
+  id         String   @id @default(cuid())
+  projectId  String?
+  name       String
+  url        String   @default("#")
+  fileType   String?
+  category   String?
+  size       String?
+  icon       String?
+  uploadedAt DateTime @default(now())
+  project    Project? @relation(fields: [projectId], references: [id])
 }
 
 model Partner {
-  id            String     @id @default(cuid())
-  name          String
-  type          String
-  description   String?
-  contact       String?
-  email         String?
-  phone         String?
-  since         Int?
-  amount        Float?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  contact     String?
+  email       String?
+  phone       String?
+  since       Int?
+  amount      Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Report {
-  id            String     @id @default(cuid())
-  name          String
-  description   String?
-  reportDate    DateTime
-  createdAt     DateTime   @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  reportDate  DateTime
+  createdAt   DateTime @default(now())
 }
 
 model CalendarEvent {
-  id            String     @id @default(cuid())
-  title         String
-  date          DateTime
-  time          String?
-  allDay        Boolean    @default(false)
-  color         String     @default("green")
-  projectId     String?
-  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdAt     DateTime   @default(now())
+  id        String   @id @default(cuid())
+  title     String
+  date      DateTime
+  time      String?
+  allDay    Boolean  @default(false)
+  color     String   @default("green")
+  projectId String?
+  createdAt DateTime @default(now())
+  project   Project? @relation(fields: [projectId], references: [id])
 }
 
 model Message {
-  id            String     @id @default(cuid())
-  content       String
-  encrypted     String?
-  senderId      String
-  sender        User       @relation("MessageSender", fields: [senderId], references: [id])
-  recipientId   String?
-  groupId       String?
-  isRead        Boolean    @default(false)
-  createdAt     DateTime   @default(now())
+  id          String   @id @default(cuid())
+  content     String
+  encrypted   String?
+  senderId    String
+  recipientId String?
+  groupId     String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
 }
 
 model Activity {
-  id            String     @id @default(cuid())
-  action        String
-  entity        String
-  entityId      String
-  description   String?
-  userId        String
-  user          User       @relation(fields: [userId], references: [id])
-  projectId     String?
-  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  taskId        String?
-  task          Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  createdAt     DateTime   @default(now())
+  id          String   @id @default(cuid())
+  action      String
+  entity      String
+  entityId    String
+  description String?
+  userId      String
+  projectId   String?
+  taskId      String?
+  createdAt   DateTime @default(now())
+  project     Project? @relation(fields: [projectId], references: [id])
+  task        Task?    @relation(fields: [taskId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model Notification {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String
-  message       String
-  type          String?
-  isRead        Boolean    @default(false)
-  createdAt     DateTime   @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
-  id            String     @id @default(cuid())
+  id            String   @id @default(cuid())
   userId        String
-  user          User       @relation("PaymentUser", fields: [userId], references: [id])
   amount        Float
-  currency      String     @default("ETB")
+  currency      String   @default("ETB")
   method        String
-  status        String     @default("pending")
+  status        String   @default("pending")
   transactionId String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation("PaymentUser", fields: [userId], references: [id])
 }
 
 model AuditLog {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id])
-  action        String
-  resource      String
-  details       String?
-  ipAddress     String?
-  createdAt     DateTime   @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  resource  String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }

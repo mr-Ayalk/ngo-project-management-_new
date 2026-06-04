@@ -13,7 +13,7 @@ export default function DashboardLayout({ children }) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (!loading && !user) {
-    router.push('/');
+    router.push('/login');
     return null;
   }
 

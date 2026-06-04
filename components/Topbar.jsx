@@ -2,10 +2,20 @@
 
 import { useState } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
+import { useAuth } from '@/components/AuthProvider';
 
 const Topbar = ({ onMenuToggle, onSearch }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
+
+  const initials = user?.name
+    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
+
+  const roleLabel = user?.role
+    ? user.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : '';
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -48,10 +58,10 @@ const Topbar = ({ onMenuToggle, onSearch }) => {
           <span className="notif-dot"></span>
         </button>
         <div className="user-chip">
-          <div className="avatar">GJ</div>
+          <div className="avatar">{initials}</div>
           <div>
-            <div className="user-name">Grace Johnson</div>
-            <div className="user-role">Project Manager</div>
+            <div className="user-name">{user?.name || 'User'}</div>
+            <div className="user-role">{roleLabel}</div>
           </div>
         </div>
       </div>

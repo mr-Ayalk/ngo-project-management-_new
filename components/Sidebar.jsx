@@ -1,6 +1,9 @@
 'use client';
 
+import { useAuth } from '@/components/AuthProvider';
+
 const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
+  const { logout } = useAuth();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'projects', label: 'Projects', icon: 'projects' },
@@ -114,10 +117,22 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
           </div>
         ))}
       </nav>
-      <div className="sidebar-promo">
-        <div className="promo-img-placeholder">🌍</div>
-        <p>Empowering communities. Building a better future.</p>
-        <button type="button" onClick={() => onPageChange('settings')}>Learn More</button>
+      <div className="sidebar-footer">
+        <button
+          type="button"
+          className="sidebar-logout"
+          onClick={() => {
+            onClose?.();
+            logout();
+          }}
+        >
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Log out
+        </button>
       </div>
     </aside>
   );
