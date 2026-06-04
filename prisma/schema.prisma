@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,9 +13,10 @@ model User {
   name          String
   password      String
   avatar        String?
-  role          String     @default("staff") // admin, manager, staff, donor
+  role          String     @default("staff")
   isActive      Boolean    @default(true)
   lastLogin     DateTime?
+  joinedDate    DateTime   @default(now())
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -29,11 +29,30 @@ model User {
   auditLogs     AuditLog[]
 }
 
+model Organization {
+  id                    String   @id @default(cuid())
+  name                  String
+  email                 String?
+  phone                 String?
+  country               String?
+  location              String?
+  description           String?
+  totalBeneficiaries    Int      @default(0)
+  childrenCount         Int      @default(0)
+  womenFamiliesCount    Int      @default(0)
+  communityMembersCount Int      @default(0)
+  beneficiariesThisMonth Int     @default(0)
+  activePrograms        Int      @default(0)
+  completionRate        Int      @default(0)
+  updatedAt             DateTime @updatedAt
+}
+
 model Project {
   id            String     @id @default(cuid())
   name          String
   description   String?
-  status        String     @default("planning") // planning, active, completed, delayed
+  status        String     @default("on-track")
+  icon          String     @default("green")
   startDate     DateTime
   endDate       DateTime
   budget        Float
@@ -51,14 +70,15 @@ model Project {
   documents     Document[]
   budgets       Budget[]
   activities    Activity[]
+  calendarEvents CalendarEvent[]
 }
 
 model Task {
   id            String     @id @default(cuid())
   title         String
   description   String?
-  status        String     @default("todo") // todo, in_progress, completed
-  priority      String     @default("medium") // low, medium, high
+  status        String     @default("todo")
+  priority      String     @default("medium")
   dueDate       DateTime?
   projectId     String
   project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -75,8 +95,9 @@ model Beneficiary {
   name          String
   email         String?
   phone         String?
-  category      String? // children, women, families, community_members
-  status        String     @default("active") // active, follow-up, inactive
+  program       String?
+  category      String?
+  status        String     @default("active")
   enrolledDate  DateTime   @default(now())
   region        String?
   notes         String?
@@ -102,7 +123,7 @@ model Budget {
   id            String     @id @default(cuid())
   projectId     String
   project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  category      String     // personnel, equipment, travel, admin
+  category      String
   allocated     Float
   spent         Float      @default(0)
   createdAt     DateTime   @default(now())
@@ -111,18 +132,55 @@ model Budget {
 
 model Document {
   id            String     @id @default(cuid())
-  projectId     String
-  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String?
+  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   name          String
-  url           String
-  type          String? // proposal, report, contract
+  url           String     @default("#")
+  fileType      String?
+  category      String?
+  size          String?
+  icon          String?
   uploadedAt    DateTime   @default(now())
+}
+
+model Partner {
+  id            String     @id @default(cuid())
+  name          String
+  type          String
+  description   String?
+  contact       String?
+  email         String?
+  phone         String?
+  since         Int?
+  amount        Float?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Report {
+  id            String     @id @default(cuid())
+  name          String
+  description   String?
+  reportDate    DateTime
+  createdAt     DateTime   @default(now())
+}
+
+model CalendarEvent {
+  id            String     @id @default(cuid())
+  title         String
+  date          DateTime
+  time          String?
+  allDay        Boolean    @default(false)
+  color         String     @default("green")
+  projectId     String?
+  project       Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
 }
 
 model Message {
   id            String     @id @default(cuid())
   content       String
-  encrypted     String? // for end-to-end encryption
+  encrypted     String?
   senderId      String
   sender        User       @relation("MessageSender", fields: [senderId], references: [id])
   recipientId   String?
@@ -133,8 +191,8 @@ model Message {
 
 model Activity {
   id            String     @id @default(cuid())
-  action        String     // created, updated, completed, deleted
-  entity        String     // project, task, budget, document
+  action        String
+  entity        String
   entityId      String
   description   String?
   userId        String
@@ -152,7 +210,7 @@ model Notification {
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   title         String
   message       String
-  type          String? // info, warning, success, error
+  type          String?
   isRead        Boolean    @default(false)
   createdAt     DateTime   @default(now())
 }
@@ -163,8 +221,8 @@ model Payment {
   user          User       @relation("PaymentUser", fields: [userId], references: [id])
   amount        Float
   currency      String     @default("ETB")
-  method        String     // chapa, paypal
-  status        String     @default("pending") // pending, completed, failed
+  method        String
+  status        String     @default("pending")
   transactionId String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt

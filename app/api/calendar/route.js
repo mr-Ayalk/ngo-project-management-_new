@@ -1,0 +1,86 @@
+export const dynamic = 'force-dynamic';
+
+import prisma from '@/lib/db';
+import { json, error, parseBody } from '@/lib/api-utils';
+
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const year = parseInt(searchParams.get('year') || '2024', 10);
+    const month = parseInt(searchParams.get('month') || '5', 10);
+
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59);
+
+    const events = await prisma.calendarEvent.findMany({
+      where: { date: { gte: start, lte: end } },
+      include: { project: { select: { name: true } } },
+      orderBy: { date: 'asc' },
+    });
+
+    const firstDay = start.getDay();
+    const daysInMonth = end.getDate();
+    const prevDays = new Date(year, month - 1, 0).getDate();
+
+    const eventsByDay = {};
+    events.forEach((e) => {
+      const day = new Date(e.date).getDate();
+      if (!eventsByDay[day]) eventsByDay[day] = [];
+      eventsByDay[day].push({ t: e.title, c: e.color, id: e.id });
+    });
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push({ num: prevDays - firstDay + i + 1, otherMonth: true });
+    }
+    const today = new Date();
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push({
+        num: d,
+        today: today.getFullYear() === year && today.getMonth() === month - 1 && today.getDate() === d,
+        events: eventsByDay[d] || [],
+      });
+    }
+    const remaining = 42 - firstDay - daysInMonth;
+    for (let d = 1; d <= remaining; d++) {
+      days.push({ num: d, otherMonth: true });
+    }
+
+    const upcoming = events.slice(0, 6).map((e) => {
+      const d = new Date(e.date);
+      const dateStr = e.allDay
+        ? `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · All Day`
+        : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${e.time || '9:00 AM'}`;
+      return { id: e.id, title: e.title, date: dateStr, color: e.color };
+    });
+
+    const monthLabel = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    return json({ days, upcoming, monthLabel, year, month });
+  } catch (err) {
+    console.error('Calendar GET error:', err);
+    return error('Failed to load calendar', 500);
+  }
+}
+
+export async function POST(req) {
+  try {
+    const body = await parseBody(req);
+    if (!body?.title || !body?.date) return error('Title and date are required');
+
+    const event = await prisma.calendarEvent.create({
+      data: {
+        title: body.title,
+        date: new Date(body.date),
+        time: body.time,
+        allDay: body.allDay || false,
+        color: body.color || 'green',
+        projectId: body.projectId || null,
+      },
+    });
+
+    return json(event, 201);
+  } catch (err) {
+    return error('Failed to create event', 500);
+  }
+}

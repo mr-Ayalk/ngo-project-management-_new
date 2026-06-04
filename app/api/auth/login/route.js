@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { verifyPassword, signJWT } from '@/lib/auth';
 import prisma from '@/lib/db';
 

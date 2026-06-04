@@ -11,22 +11,33 @@ export function AuthProvider({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    
-    if (token) {
-      // Decode token to get user info (in production, verify on backend)
+    async function loadUser() {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          setUser(payload);
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('token');
+          setUser(null);
         }
-      } catch (err) {
+      } catch {
         localStorage.removeItem('token');
         setUser(null);
       }
+      setLoading(false);
     }
-    setLoading(false);
+
+    loadUser();
   }, []);
 
   const logout = () => {
