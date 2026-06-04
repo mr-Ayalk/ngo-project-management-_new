@@ -1,13 +1,14 @@
 'use client';
 
+import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
+import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
   const { logout } = useAuth();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'projects', label: 'Projects', icon: 'projects' },
-    { id: 'tasks', label: 'Tasks', icon: 'tasks' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'budget', label: 'Budget', icon: 'budget' },
     { id: 'reports', label: 'Reports', icon: 'reports' },
@@ -99,8 +100,8 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-logo">
-        <div className="logo-img">ENA</div>
-        <div className="logo-text">ENGAGE NOW<br/>AFRICA</div>
+        <Image src={logo1} alt="Engage Now Africa" className="sidebar-logo-img" priority />
+        Engage Now Africa
       </div>
       {isOpen && (
         <button className="mobile-close" onClick={onClose} aria-label="Close menu">✕</button>

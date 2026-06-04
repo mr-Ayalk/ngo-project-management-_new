@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
 
-const Topbar = ({ onMenuToggle, onSearch }) => {
+const Topbar = ({ onMenuToggle, onSearch, searchQuery = '' }) => {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    setQuery(searchQuery);
+  }, [searchQuery]);
 
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()

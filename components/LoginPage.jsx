@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
+import logo2 from '@/app/assets/logo2.png';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -33,8 +35,7 @@ export default function LoginPage() {
       <div className="login-panel login-panel-brand">
         <div className="login-brand-content">
           <div className="login-logo">
-            <div className="logo-img">ENA</div>
-            <div className="logo-text">ENGAGE NOW<br />AFRICA</div>
+            <Image src={logo2} alt="Engage Now Africa" className="login-logo-img" priority />
           </div>
           <h1 className="login-headline">Project management built for impact.</h1>
           <p className="login-tagline">

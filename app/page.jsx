@@ -46,12 +46,15 @@ export default function DashboardPage() {
         onClose={() => setSidebarOpen(false)}
       />
       <div className="main-container">
-        <Topbar onMenuToggle={() => setSidebarOpen((s) => !s)} onSearch={handleGlobalSearch} />
+        <Topbar
+          onMenuToggle={() => setSidebarOpen((s) => !s)}
+          onSearch={handleGlobalSearch}
+          searchQuery={globalSearch}
+        />
         <DashboardPages
           currentPage={currentPage}
           onNavigate={setCurrentPage}
           globalSearch={globalSearch}
-          onGlobalSearchClear={() => setGlobalSearch('')}
         />
       </div>
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}

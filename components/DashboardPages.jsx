@@ -29,9 +29,54 @@ const KANBAN_COLS = [
   { key: 'completed', label: 'Completed' },
 ];
 
+function KanbanBoard({ tasks, draggedTask, dropTarget, onDragStart, onDragOver, onDragLeave, onDrop, onTaskClick, showProject = true }) {
+  if (!tasks) return <Loading />;
+  return (
+    <div className="kanban">
+      {KANBAN_COLS.map(({ key, label }) => (
+        <div
+          key={key}
+          className={`kanban-col${dropTarget === key ? ' drop-target' : ''}`}
+          onDragOver={(e) => onDragOver(e, key)}
+          onDragLeave={onDragLeave}
+          onDrop={(e) => onDrop(e, key)}
+        >
+          <div className="kanban-col-header">
+            <span className="col-title">{label}</span>
+            <span className="col-count">{tasks.counts[key]}</span>
+          </div>
+          {tasks.columns[key].map((task) => (
+            <div
+              key={task.id}
+              className={`kanban-card${draggedTask?.id === task.id ? ' dragging' : ''}`}
+              draggable={!task.done}
+              onDragStart={() => onDragStart({ id: task.id, status: key })}
+              onClick={() => onTaskClick(task)}
+              style={task.done ? { opacity: 0.8 } : {}}
+            >
+              <div className="kanban-card-title" style={task.done ? { textDecoration: 'line-through', color: 'var(--gray-400)' } : {}}>
+                {task.title}
+              </div>
+              {showProject && <div className="kanban-card-project">{task.project}</div>}
+              <div className="kanban-card-footer">
+                <span className={`priority-badge ${task.priority}`}>
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                </span>
+                <span className="card-due" style={task.done ? { color: 'var(--green)' } : {}}>
+                  {task.done ? 'Done' : task.date}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const DOC_CATEGORIES = ['all', 'reports', 'budget', 'data', 'contracts', 'media', 'training', 'feedback'];
 
-const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchClear }) => {
+const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
@@ -43,7 +88,6 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
 
   const [dashboard, setDashboard] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [tasks, setTasks] = useState(null);
   const [calendar, setCalendar] = useState(null);
   const [budget, setBudget] = useState(null);
   const [reports, setReports] = useState([]);
@@ -59,6 +103,8 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
 
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectDetail, setProjectDetail] = useState(null);
+  const [projectView, setProjectView] = useState('list');
+  const [projectTasks, setProjectTasks] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [menuOpen, setMenuOpen] = useState(null);
 
@@ -121,14 +167,10 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
         case 'projects': {
           const params = {};
           if (projectFilter !== 'all') params.status = projectFilter;
-          const search = projectSearch || globalSearch;
-          if (search) params.search = search;
+          if (projectSearch) params.search = projectSearch;
           setProjects(await api.projects(params));
           break;
         }
-        case 'tasks':
-          setTasks(await api.tasks());
-          break;
         case 'calendar':
           setCalendar(await api.calendar(calYear, calMonth));
           break;
@@ -180,29 +222,62 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
     } finally {
       setLoading(false);
     }
-  }, [currentPage, projectFilter, projectSearch, beneRegion, beneSearch, docCategory, calYear, calMonth, globalSearch]);
+  }, [currentPage, projectFilter, projectSearch, beneRegion, beneSearch, docCategory, calYear, calMonth]);
+
+  const loadProjectTasks = useCallback(async (projectId) => {
+    if (!projectId) return;
+    try {
+      setProjectTasks(await api.tasks({ projectId }));
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }, [showToast]);
+
+  const openProjectDetail = (proj, tab = 'overview') => {
+    setSelectedProject(proj);
+    setProjectView('detail');
+    setActiveTab(tab);
+  };
+
+  const closeProjectDetail = () => {
+    setProjectView('list');
+    setSelectedProject(null);
+    setProjectDetail(null);
+    setProjectTasks(null);
+    setActiveTab('overview');
+  };
 
   useEffect(() => { loadPageData(); }, [loadPageData]);
   useEffect(() => { loadLookup(); }, [loadLookup]);
 
   useEffect(() => {
-    if (globalSearch) {
-      setProjectSearch(globalSearch);
-      if (currentPage === 'projects') loadPageData();
+    if (currentPage !== 'projects') {
+      setProjectView('list');
+      setSelectedProject(null);
+      setProjectDetail(null);
+      setProjectTasks(null);
     }
-  }, [globalSearch, currentPage]);
+  }, [currentPage]);
 
   useEffect(() => {
-    if (currentPage === 'projects' && globalSearch) {
-      onGlobalSearchClear?.();
+    if (globalSearch) {
+      setProjectSearch(globalSearch);
     }
-  }, [currentPage, globalSearch, onGlobalSearchClear]);
+  }, [globalSearch]);
 
   useEffect(() => {
     if (selectedProject?.id) {
       api.project(selectedProject.id).then(setProjectDetail).catch(() => setProjectDetail(null));
-    } else setProjectDetail(null);
+    } else {
+      setProjectDetail(null);
+    }
   }, [selectedProject]);
+
+  useEffect(() => {
+    if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+      loadProjectTasks(selectedProject.id);
+    }
+  }, [projectView, selectedProject, activeTab, loadProjectTasks]);
 
   useEffect(() => {
     if (currentPage !== 'dashboard' || !dashboard?.chart || !chartRef.current) return;
@@ -219,7 +294,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
         labels,
         datasets: [
           { label: 'Planned', data: planned, borderColor: '#d1d5db', borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false },
-          { label: 'Actual', data: actual, borderColor: '#1a6b3c', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, backgroundColor: 'rgba(26,107,60,0.07)' },
+          { label: 'Actual', data: actual, borderColor: '#1E75E5', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, backgroundColor: 'rgba(30,117,229,0.07)' },
         ],
       },
       options: {
@@ -270,7 +345,10 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : '',
       });
     } else {
-      setTaskForm({ ...EMPTY_TASK, projectId: data.projects[0]?.id || '' });
+      setTaskForm({
+        ...EMPTY_TASK,
+        projectId: selectedProject?.id || data.projects[0]?.id || '',
+      });
     }
     setModal('task');
   };
@@ -299,6 +377,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       }
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
       if (currentPage === 'dashboard') api.dashboard().then(setDashboard);
     } catch (err) {
       showToast(err.message, 'error');
@@ -313,7 +394,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       await api.deleteProject(id);
       showToast('Project deleted');
       setMenuOpen(null);
-      setSelectedProject(null);
+      closeProjectDetail();
       loadPageData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -340,6 +421,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       }
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -356,7 +440,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
     try {
       await api.updateTask(draggedTask.id, { status: newStatus });
       showToast('Task moved');
-      loadPageData();
+      if (projectView === 'detail' && selectedProject?.id) {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -365,15 +451,17 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
   };
 
   const handleCompleteTask = async (taskTitle) => {
-    if (!tasks?.tasks) return;
-    const task = tasks.tasks.find((t) => t.title === taskTitle);
-    if (!task) { onNavigate?.('tasks'); return; }
     try {
+      const allTasks = await api.tasks();
+      const task = allTasks.tasks.find((t) => t.title === taskTitle);
+      if (!task) {
+        onNavigate?.('projects');
+        return;
+      }
       await api.updateTask(task.id, { status: 'completed' });
       showToast('Task marked complete');
-      const [dash, taskData] = await Promise.all([api.dashboard(), currentPage === 'tasks' ? api.tasks() : Promise.resolve(null)]);
+      const dash = await api.dashboard();
       setDashboard(dash);
-      if (taskData) setTasks(taskData);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -394,6 +482,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('Event added');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -413,6 +504,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast(result.message || 'Expense added');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
       if (currentPage === 'dashboard') api.dashboard().then(setDashboard);
     } catch (err) {
       showToast(err.message, 'error');
@@ -429,6 +523,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('Beneficiary added');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -448,6 +545,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('Document uploaded');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -463,6 +563,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('Partner added');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -478,6 +581,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('Report created');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -506,6 +612,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       showToast('User updated');
       closeModal();
       loadPageData();
+      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
+        loadProjectTasks(selectedProject.id);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -573,7 +682,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
     showToast('Document downloaded');
   };
 
-  if (loading && !dashboard && !projects.length && !tasks && !budget && !beneficiaries) {
+  if (loading && !dashboard && !projects.length && !budget && !beneficiaries) {
     return <Loading />;
   }
 
@@ -594,7 +703,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
                 <div className="kpi-icon blue"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg></div></div>
               <div className="kpi-delta">{dashboard.kpis.activeProjectsDelta}</div>
             </div>
-            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('tasks')}>
+            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('projects')}>
               <div className="kpi-top"><div><div className="kpi-label">Tasks Completed</div><div className="kpi-value">{dashboard.kpis.tasksCompleted}</div></div>
                 <div className="kpi-icon green"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg></div></div>
               <div className="kpi-delta">{dashboard.kpis.tasksCompletedDelta}</div>
@@ -645,7 +754,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
               <div className="status-donut"><div className="status-legend">
                 {dashboard.projectStatusSummary.map((s, i) => (
                   <div key={i} className="status-item" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('projects')}>
-                    <div className="status-dot" style={{ background: i === 0 ? '#1a6b3c' : i === 1 ? '#f59e0b' : '#ef4444' }}></div>
+                    <div className="status-dot" style={{ background: i === 0 ? '#1E75E5' : i === 1 ? '#f59e0b' : '#ef4444' }}></div>
                     {s.status} — {s.count} ({s.pct}%)
                   </div>
                 ))}
@@ -654,7 +763,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
             <div className="card">
               <div className="card-header">
                 <span className="card-title">Upcoming Tasks</span>
-                <span className="card-action" onClick={() => onNavigate?.('tasks')}>View All</span>
+                <span className="card-action" onClick={() => onNavigate?.('projects')}>View All</span>
               </div>
               {dashboard.upcomingTasks.map((task, i) => (
                 <div key={i} className="task-item" style={{ cursor: 'pointer' }} onClick={() => handleCompleteTask(task.title)}>
@@ -682,7 +791,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
       )}
 
       {/* ── PROJECTS ── */}
-      {currentPage === 'projects' && (
+      {currentPage === 'projects' && projectView === 'list' && (
         <>
           <div className="projects-topbar">
             <div><h1>Projects</h1><p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>Manage and track all your projects.</p></div>
@@ -692,13 +801,13 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
             <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
               <option value="all">All Status</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option>
             </select>
-            <input className="search-inline" type="text" placeholder="Search projects..." value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && loadPageData()} />
+            <input className="search-inline" type="text" placeholder="Search projects..." value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
           </div>
           {loading ? <Loading /> : (
             <div className="projects-table">
               <div className="table-head"><span>Project</span><span>Status</span><span>Progress</span><span>Budget</span><span>Start Date</span><span></span></div>
               {projects.map((proj) => (
-                <div key={proj.id} className="table-row" onClick={() => setSelectedProject(proj)}>
+                <div key={proj.id} className="table-row" onClick={() => openProjectDetail(proj)}>
                   <div className="proj-name-cell"><div className={`proj-icon ${proj.icon}`}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div><span className="proj-name">{proj.name}</span></div>
                   <span><span className={`status-badge ${proj.status}`}><span className="status-dot"></span>{statusLabel(proj.status)}</span></span>
                   <span><div className="prog-wrap"><div className="prog-bar"><div className={`prog-fill${proj.status === 'at-risk' ? ' amber' : proj.status === 'delayed' ? ' red' : ''}`} style={{ width: `${proj.progress}%` }}></div></div><span className="prog-pct">{proj.progress}%</span></div></span>
@@ -708,7 +817,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
                     <button className="more-btn" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === proj.id ? null : proj.id); }}>⋯</button>
                     {menuOpen === proj.id && (
                       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => { setSelectedProject(proj); setMenuOpen(null); }}>View</button>
+                        <button onClick={() => { openProjectDetail(proj); setMenuOpen(null); }}>View</button>
                         <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>
                         <button className="danger" onClick={() => handleDeleteProject(proj.id)}>Delete</button>
                       </div>
@@ -718,77 +827,97 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch, onGlobalSearchC
               ))}
             </div>
           )}
-          {selectedProject && projectDetail && (
-            <Modal open title={projectDetail.name} onClose={() => setSelectedProject(null)} width={560}>
-              <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '16px' }}>{projectDetail.description}</p>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {['overview', 'tasks', 'budget', 'documents'].map((tab) => (
-                  <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-200)', background: activeTab === tab ? 'var(--green)' : '#fff', color: activeTab === tab ? '#fff' : 'inherit', fontSize: '11px', cursor: 'pointer', textTransform: 'capitalize' }}>{tab}</button>
-                ))}
-              </div>
-              {activeTab === 'overview' && (
-                <div style={{ fontSize: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div><strong>Manager:</strong> {projectDetail.manager}</div>
-                  <div><strong>Spent:</strong> {projectDetail.spent}</div>
-                  <div><strong>Utilization:</strong> {projectDetail.utilization}</div>
-                  <div><strong>Due:</strong> {projectDetail.dueDate}</div>
-                </div>
-              )}
-              {activeTab === 'tasks' && projectDetail.tasks.map((t, i) => (
-                <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-100)', fontSize: '12px', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => { setSelectedProject(null); onNavigate?.('tasks'); }}>
-                  <span>{t.name}</span><span style={{ color: 'var(--gray-400)' }}>{t.assignee} · {t.status}</span>
-                </div>
-              ))}
-              {activeTab === 'budget' && projectDetail.budgetCategories.map((b, i) => (
-                <div key={i} style={{ padding: '8px 0', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{b.category}</span><span>{b.spent} / {b.allocated}</span></div>
-                  <div className="bar-track" style={{ marginTop: '4px' }}><div className="bar-fill" style={{ width: `${b.pct}%` }}></div></div>
-                </div>
-              ))}
-              {activeTab === 'documents' && (
-                <div>{projectDetail.documents?.length ? projectDetail.documents.map((d, i) => (
-                  <div key={i} style={{ fontSize: '12px', padding: '6px 0', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }} onClick={() => { setSelectedProject(null); onNavigate?.('documents'); }}>{d.name}</div>
-                )) : <p style={{ fontSize: '12px', color: 'var(--gray-400)' }}>No documents yet</p>}</div>
-              )}
-              <div className="form-actions">
-                <button className="btn-secondary" onClick={() => { openProjectModal(selectedProject); setSelectedProject(null); }}>Edit Project</button>
-                <button className="btn-primary" onClick={() => { setSelectedProject(null); openTaskModal({ projectId: selectedProject.id, project: selectedProject.name }); }}>Add Task</button>
-              </div>
-            </Modal>
-          )}
         </>
       )}
 
-      {/* ── TASKS ── */}
-      {currentPage === 'tasks' && tasks && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Tasks</h1><p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>Drag cards between columns to update status.</p></div>
-            <button className="btn-primary" onClick={() => openTaskModal()}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Task</button>
+      {currentPage === 'projects' && projectView === 'detail' && selectedProject && projectDetail && (
+        <div className="project-detail-page">
+          <button type="button" className="project-detail-back" onClick={closeProjectDetail}>
+            ← Back to Projects
+          </button>
+          <div className="project-detail-header">
+            <div>
+              <h1>{projectDetail.name}</h1>
+              <p>{projectDetail.description}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button className="btn-secondary" onClick={() => openProjectModal(selectedProject)}>Edit Project</button>
+              {activeTab === 'tasks' && (
+                <button className="btn-primary" onClick={() => openTaskModal({ projectId: selectedProject.id, project: selectedProject.name })}>
+                  + New Task
+                </button>
+              )}
+            </div>
           </div>
-          <div className="kanban">
-            {KANBAN_COLS.map(({ key, label }) => (
-              <div key={key} className={`kanban-col${dropTarget === key ? ' drop-target' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDropTarget(key); }}
-                onDragLeave={() => setDropTarget(null)}
-                onDrop={(e) => { e.preventDefault(); handleTaskDrop(key); }}>
-                <div className="kanban-col-header"><span className="col-title">{label}</span><span className="col-count">{tasks.counts[key]}</span></div>
-                {tasks.columns[key].map((task) => (
-                  <div key={task.id} className={`kanban-card${draggedTask?.id === task.id ? ' dragging' : ''}`} draggable={!task.done}
-                    onDragStart={() => setDraggedTask({ id: task.id, status: key })}
-                    onClick={() => openTaskModal(task)} style={task.done ? { opacity: 0.8 } : {}}>
-                    <div className="kanban-card-title" style={task.done ? { textDecoration: 'line-through', color: 'var(--gray-400)' } : {}}>{task.title}</div>
-                    <div className="kanban-card-project">{task.project}</div>
-                    <div className="kanban-card-footer">
-                      <span className={`priority-badge ${task.priority}`}>{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</span>
-                      <span className="card-due" style={task.done ? { color: 'var(--green)' } : {}}>{task.done ? 'Done' : task.date}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="project-detail-tabs">
+            {['overview', 'tasks', 'budget', 'documents'].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={`project-detail-tab${activeTab === tab ? ' active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab}
+              </button>
             ))}
           </div>
-        </>
+
+          {activeTab === 'overview' && (
+            <div className="project-detail-overview">
+              <div className="project-detail-stat"><label>Status</label><span><span className={`status-badge ${selectedProject.status}`}><span className="status-dot"></span>{statusLabel(selectedProject.status)}</span></span></div>
+              <div className="project-detail-stat"><label>Manager</label><span>{projectDetail.manager}</span></div>
+              <div className="project-detail-stat"><label>Progress</label><span>{selectedProject.progress}%</span></div>
+              <div className="project-detail-stat"><label>Budget</label><span>{projectDetail.spent} / {selectedProject.budget}</span></div>
+              <div className="project-detail-stat"><label>Utilization</label><span>{projectDetail.utilization}</span></div>
+              <div className="project-detail-stat"><label>Due Date</label><span>{projectDetail.dueDate}</span></div>
+            </div>
+          )}
+
+          {activeTab === 'tasks' && (
+            <>
+              <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '16px' }}>
+                Drag cards between columns to update task status for this project.
+              </p>
+              <KanbanBoard
+                tasks={projectTasks}
+                draggedTask={draggedTask}
+                dropTarget={dropTarget}
+                showProject={false}
+                onDragStart={setDraggedTask}
+                onDragOver={(e, key) => { e.preventDefault(); setDropTarget(key); }}
+                onDragLeave={() => setDropTarget(null)}
+                onDrop={(e, key) => { e.preventDefault(); handleTaskDrop(key); }}
+                onTaskClick={openTaskModal}
+              />
+            </>
+          )}
+
+          {activeTab === 'budget' && (
+            <div>
+              <div className="project-detail-section-title">Budget Breakdown</div>
+              {projectDetail.budgetCategories.map((b, i) => (
+                <div key={i} style={{ padding: '12px 0', fontSize: '13px', borderBottom: '1px solid var(--gray-100)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>{b.category}</span>
+                    <span style={{ color: 'var(--gray-500)' }}>{b.spent} / {b.allocated}</span>
+                  </div>
+                  <div className="bar-track"><div className="bar-fill" style={{ width: `${b.pct}%` }}></div></div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <div>
+              <div className="project-detail-section-title">Project Documents</div>
+              {projectDetail.documents?.length ? projectDetail.documents.map((d, i) => (
+                <div key={i} style={{ fontSize: '13px', padding: '10px 0', borderBottom: '1px solid var(--gray-100)' }}>{d.name}</div>
+              )) : (
+                <p style={{ fontSize: '13px', color: 'var(--gray-400)' }}>No documents yet</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── CALENDAR ── */}
