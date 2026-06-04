@@ -2738,7 +2738,7 @@ canvas {
   background: #fff;
   cursor: pointer;
   text-decoration: none;
-  color: inherit;
+  color: #000000;
 }
 
 .messages-panel {
