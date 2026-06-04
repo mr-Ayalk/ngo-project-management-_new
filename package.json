@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "postinstall": "prisma generate",
     "build": "next build",
+    
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",

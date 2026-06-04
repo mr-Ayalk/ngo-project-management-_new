@@ -85,7 +85,7 @@ body, button, input, select, textarea, optgroup, option {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--green);
+  background: #1E75E5 ;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1806,7 +1806,7 @@ body { background: var(--bg); color: var(--text); }
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--green);
+  background: #1E75E5 ;
   display: flex;
   align-items: center;
   justify-content: center;
