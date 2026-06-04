@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }) {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden fixed inset-0">
       <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} />
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Topbar onMenuClick={() => setIsOpen(true)} />

@@ -7,7 +7,6 @@
     "dev": "next dev",
     "postinstall": "prisma generate",
     "build": "next build",
-    
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
@@ -20,20 +19,22 @@
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
+    "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.0",
-    "react-chartjs-2": "^5.2.0",
     "jose": "^5.1.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "axios": "^1.6.0"
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "19.2.16",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "prisma": "^5.7.0",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "typescript": "6.0.3"
   }
 }
