@@ -98,14 +98,14 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
       <div className="sidebar-logo">
         <Image src={logo1} alt="Engage Now Africa" className="sidebar-logo-img" priority />
-        Engage Now Africa
       </div>
       {isOpen && (
         <button className="mobile-close" onClick={onClose} aria-label="Close menu">✕</button>
       )}
+      {isOpen && <div className="sidebar-mobile-title">Menu</div>}
       <nav className="nav">
         {menuItems.map((item) => (
           <div

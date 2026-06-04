@@ -125,6 +125,8 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
   const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE);
   const [beneficiaryForm, setBeneficiaryForm] = useState(EMPTY_BENEFICIARY);
   const [documentForm, setDocumentForm] = useState(EMPTY_DOCUMENT);
+  const [documentFile, setDocumentFile] = useState(null);
+  const fileInputRef = useRef(null);
   const [partnerForm, setPartnerForm] = useState(EMPTY_PARTNER);
   const [reportForm, setReportForm] = useState(EMPTY_REPORT);
   const [viewReport, setViewReport] = useState(null);
@@ -144,6 +146,8 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
     setViewReport(null);
     setViewDocument(null);
     setEditUser(null);
+    setDocumentFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const loadLookup = useCallback(async () => {
@@ -533,21 +537,39 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
     }
   };
 
+  const handleDocumentFileSelect = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+    setDocumentFile(file);
+    setDocumentForm((prev) => ({
+      ...prev,
+      name: file.name,
+      fileType: ['PDF', 'XLSX', 'DOCX', 'CSV', 'ZIP', 'PNG', 'JPEG'].includes(ext) ? ext : prev.fileType,
+      size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+    }));
+  };
+
   const handleSaveDocument = async (e) => {
     e.preventDefault();
+    if (!documentFile) {
+      showToast('Please choose a file from your computer', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
+      const uploaded = await api.uploadDocumentFile(documentFile);
       await api.createDocument({
-        ...documentForm,
+        name: documentForm.name || uploaded.name,
+        url: uploaded.url,
+        fileType: uploaded.fileType || documentForm.fileType,
+        category: documentForm.category,
+        size: uploaded.size || documentForm.size,
+        icon: uploaded.icon,
         projectId: documentForm.projectId || null,
-        icon: documentForm.fileType === 'PDF' ? '📄' : documentForm.fileType === 'XLSX' ? '📊' : '📋',
       });
       showToast('Document uploaded');
       closeModal();
       loadPageData();
-      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
-        loadProjectTasks(selectedProject.id);
-      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -671,6 +693,16 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
   };
 
   const downloadDocument = (doc) => {
+    if (doc.url && doc.url !== '#') {
+      const a = document.createElement('a');
+      a.href = doc.url;
+      a.download = doc.name;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.click();
+      showToast('Download started');
+      return;
+    }
     const content = `Document: ${doc.name}\nProject: ${doc.project || 'N/A'}\nType: ${doc.fileType}\nUploaded: ${doc.uploaded}`;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -731,7 +763,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
               <div className="chart-area"><canvas ref={chartRef} height="140"></canvas></div>
               <div className="chart-legend">
                 <div className="chart-legend-item"><div className="legend-dot" style={{ background: '#d1d5db' }}></div>Planned</div>
-                <div className="chart-legend-item"><div className="legend-dot" style={{ background: '#1a6b3c' }}></div>Actual</div>
+                <div className="chart-legend-item"><div className="legend-dot" style={{ background: '#1E75E5' }}></div>Actual</div>
               </div>
             </div>
             <div className="card">
@@ -923,36 +955,53 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
       {/* ── CALENDAR ── */}
       {currentPage === 'calendar' && calendar && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Calendar</h1></div>
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Calendar</h1>
+              <p>Plan events, deadlines, and project milestones.</p>
+            </div>
             <button className="btn-primary" onClick={async () => { await loadLookup(); setEventForm({ ...EMPTY_EVENT, date: new Date().toISOString().slice(0, 10) }); setModal('event'); }}>+ Add Event</button>
           </div>
           <div className="cal-grid">
             <div className="cal-main">
               <div className="cal-header">
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>{calendar.monthLabel}</span>
+                <div className="cal-month-block">
+                  <span className="cal-month-label">{calendar.monthLabel}</span>
+                  <span className="cal-year-label">{calYear}</span>
+                </div>
                 <div className="cal-nav">
-                  <button onClick={() => { const m = calMonth === 1 ? 12 : calMonth - 1; setCalYear(calMonth === 1 ? calYear - 1 : calYear); setCalMonth(m); }}>‹</button>
-                  <button onClick={() => { const now = new Date(); setCalYear(now.getFullYear()); setCalMonth(now.getMonth() + 1); }}>Today</button>
-                  <button onClick={() => { const m = calMonth === 12 ? 1 : calMonth + 1; setCalYear(calMonth === 12 ? calYear + 1 : calYear); setCalMonth(m); }}>›</button>
+                  <button type="button" className="cal-nav-btn" aria-label="Previous month" onClick={() => { const m = calMonth === 1 ? 12 : calMonth - 1; setCalYear(calMonth === 1 ? calYear - 1 : calYear); setCalMonth(m); }}>‹</button>
+                  <button type="button" className="cal-nav-btn cal-nav-today" onClick={() => { const now = new Date(); setCalYear(now.getFullYear()); setCalMonth(now.getMonth() + 1); }}>Today</button>
+                  <button type="button" className="cal-nav-btn" aria-label="Next month" onClick={() => { const m = calMonth === 12 ? 1 : calMonth + 1; setCalYear(calMonth === 12 ? calYear + 1 : calYear); setCalMonth(m); }}>›</button>
                 </div>
               </div>
               <div className="cal-days-head"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
               <div className="cal-days">
                 {calendar.days.map((day, i) => (
-                  <div key={i} className={`cal-day${day.today ? ' today' : ''}${day.otherMonth ? ' other-month' : ''}`} onClick={() => !day.otherMonth && (setEventForm({ ...EMPTY_EVENT, date: `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day.num).padStart(2, '0')}` }), setModal('event'))}>
+                  <div key={i} className={`cal-day${day.today ? ' today' : ''}${day.otherMonth ? ' other-month' : ''}${day.events?.length ? ' has-events' : ''}`} onClick={() => !day.otherMonth && (setEventForm({ ...EMPTY_EVENT, date: `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day.num).padStart(2, '0')}` }), setModal('event'))}>
                     <div className="cal-day-num">{day.num}</div>
-                    {day.events?.map((evt, j) => (<div key={j} className={`cal-event ${evt.c}`}>{evt.t}</div>))}
+                    <div className="cal-day-events">
+                      {day.events?.map((evt, j) => (<div key={j} className={`cal-event ${evt.c}`}>{evt.t}</div>))}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="upcoming-events">
-              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Upcoming Events</div>
-              {calendar.upcoming.map((evt, i) => (
-                <div key={i} className="event-item"><div className="event-dot" style={{ background: `var(--${evt.color})` }}></div><div className="event-body"><div className="ev-title">{evt.title}</div><div className="ev-date">{evt.date}</div></div></div>
-              ))}
-            </div>
+            <aside className="upcoming-events cal-sidebar">
+              <h3 className="cal-sidebar-title">Upcoming Events</h3>
+              <p className="cal-sidebar-sub">Next on your schedule</p>
+              {calendar.upcoming.length ? calendar.upcoming.map((evt, i) => (
+                <div key={i} className="event-item">
+                  <div className="event-dot" style={{ background: `var(--${evt.color})` }} />
+                  <div className="event-body">
+                    <div className="ev-title">{evt.title}</div>
+                    <div className="ev-date">{evt.date}</div>
+                  </div>
+                </div>
+              )) : (
+                <p className="cal-empty-note">No upcoming events this month.</p>
+              )}
+            </aside>
           </div>
         </>
       )}
@@ -1042,15 +1091,15 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
               <button key={cat} className={docCategory === cat ? 'active' : ''} onClick={() => setDocCategory(cat)}>{cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}</button>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+          <div className="doc-grid">
             {documents.map((doc) => (
-              <div key={doc.id} style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '16px', boxShadow: 'var(--shadow)' }}>
-                <div style={{ fontSize: '32px', marginBottom: '8px' }}>{doc.icon}</div>
-                <div style={{ fontSize: '12.5px', fontWeight: '500', color: 'var(--gray-800)' }}>{doc.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '3px' }}>{doc.date}</div>
+              <div key={doc.id} className="doc-card">
+                <div className="doc-card-icon">{doc.icon}</div>
+                <div className="doc-card-name">{doc.name}</div>
+                <div className="doc-card-meta">{doc.date}</div>
                 <div className="doc-card-actions">
-                  <button onClick={() => { setViewDocument(doc); setModal('documentView'); }}>View</button>
-                  <button onClick={() => downloadDocument(doc)}>Download</button>
+                  <button type="button" onClick={() => { setViewDocument(doc); setModal('documentView'); }}>View</button>
+                  <button type="button" onClick={() => downloadDocument(doc)}>Download</button>
                 </div>
               </div>
             ))}
@@ -1065,12 +1114,12 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
             <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Partners</h1></div>
             <button className="btn-primary" onClick={() => { setPartnerForm(EMPTY_PARTNER); setModal('partner'); }}>+ Add Partner</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+          <div className="partner-grid">
             {partners.map((partner) => (
-              <div key={partner.id} style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '16px', boxShadow: 'var(--shadow)' }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>{partner.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginBottom: '8px' }}>{partner.type}</div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-600)' }}>{partner.desc || partner.description}</div>
+              <div key={partner.id} className="partner-card">
+                <div className="partner-card-name">{partner.name}</div>
+                <div className="partner-card-type">{partner.type}</div>
+                <div className="partner-card-desc">{partner.desc || partner.description}</div>
                 {(partner.email || partner.phone) && (
                   <div className="partner-actions">
                     {partner.email && <a href={`mailto:${partner.email}`}>Email</a>}
@@ -1108,9 +1157,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
       {currentPage === 'settings' && organization && (
         <>
           <div style={{ marginBottom: '16px' }}><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Settings</h1></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '16px', boxShadow: 'var(--shadow)' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '14px' }}>Organization Info</div>
+          <div className="settings-grid">
+            <div className="settings-card">
+              <div className="settings-card-title">Organization Info</div>
               {['name', 'country', 'email', 'phone', 'location'].map((field) => (
                 <div key={field} className="form-field">
                   <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
@@ -1120,13 +1169,13 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
               <div className="form-field"><label>Description</label><textarea value={orgForm.description || ''} onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })} /></div>
               <button className="btn-primary" style={{ fontSize: '11px' }} onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
             </div>
-            <div style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '16px', boxShadow: 'var(--shadow)' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '14px' }}>Manage Users & Roles</div>
-              <div style={{ border: '1px solid var(--gray-100)', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', padding: '8px 12px', background: 'var(--gray-50)', fontSize: '11px', fontWeight: '600', color: 'var(--gray-500)' }}><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
+            <div className="settings-card">
+              <div className="settings-card-title">Manage Users & Roles</div>
+              <div className="settings-users-table">
+                <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
                 {users.map((u) => (
-                  <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', padding: '9px 12px', borderTop: '1px solid var(--gray-100)', fontSize: '12px', cursor: 'pointer' }} onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
-                    <span>{u.name}</span><span style={{ color: 'var(--green)' }}>{u.roleLabel}</span><span style={{ color: u.isActive ? 'var(--green)' : 'var(--gray-400)' }}>{u.status}</span>
+                  <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
+                    <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
                   </div>
                 ))}
               </div>
@@ -1216,13 +1265,42 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
 
       <Modal open={modal === 'document'} title="Upload Document" onClose={closeModal}>
         <form onSubmit={handleSaveDocument}>
-          <div className="form-field"><label>File Name *</label><input required value={documentForm.name} onChange={(e) => setDocumentForm({ ...documentForm, name: e.target.value })} placeholder="Report Q2.pdf" /></div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="file-input-hidden"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.png,.jpg,.jpeg"
+            onChange={(e) => handleDocumentFileSelect(e.target.files?.[0])}
+          />
+          <div
+            className={`file-drop-zone${documentFile ? ' has-file' : ''}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+            onDragLeave={(e) => e.currentTarget.classList.remove('drag-over')}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.remove('drag-over');
+              handleDocumentFileSelect(e.dataTransfer.files?.[0]);
+            }}
+          >
+            <div className="file-drop-icon">📁</div>
+            {documentFile ? (
+              <>
+                <div className="file-drop-title">{documentFile.name}</div>
+                <div className="file-drop-hint">{documentForm.size || ''} · Click to choose a different file</div>
+              </>
+            ) : (
+              <>
+                <div className="file-drop-title">Choose a file from your computer</div>
+                <div className="file-drop-hint">Click to browse or drag and drop · PDF, Word, Excel, CSV, ZIP, images · Max 10 MB</div>
+              </>
+            )}
+          </div>
           <div className="form-row">
             <div className="form-field"><label>Category</label><select value={documentForm.category} onChange={(e) => setDocumentForm({ ...documentForm, category: e.target.value })}>{DOC_CATEGORIES.filter((c) => c !== 'all').map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
-            <div className="form-field"><label>Type</label><select value={documentForm.fileType} onChange={(e) => setDocumentForm({ ...documentForm, fileType: e.target.value })}><option>PDF</option><option>XLSX</option><option>DOCX</option><option>CSV</option><option>ZIP</option></select></div>
+            <div className="form-field"><label>Project</label><select value={documentForm.projectId} onChange={(e) => setDocumentForm({ ...documentForm, projectId: e.target.value })}><option value="">All Projects</option>{lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           </div>
-          <div className="form-field"><label>Project</label><select value={documentForm.projectId} onChange={(e) => setDocumentForm({ ...documentForm, projectId: e.target.value })}><option value="">All Projects</option>{lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-          <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Upload</button></div>
+          <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting || !documentFile}>{submitting ? 'Uploading…' : 'Upload'}</button></div>
         </form>
       </Modal>
 
