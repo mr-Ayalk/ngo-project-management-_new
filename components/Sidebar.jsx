@@ -101,6 +101,7 @@ const Sidebar = ({ currentPage, onPageChange, isOpen, onClose }) => {
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
       <div className="sidebar-logo">
         <Image src={logo1} alt="Engage Now Africa" className="sidebar-logo-img" priority />
+        <span className="sidebar-logo-text">Engage Now Africa</span>
       </div>
       {isOpen && (
         <button className="mobile-close" onClick={onClose} aria-label="Close menu">✕</button>
