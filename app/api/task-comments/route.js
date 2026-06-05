@@ -40,6 +40,9 @@ async function notifyTeamMembers(taskId, projectId, senderId, title, message) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const taskId = searchParams.get('taskId');
     if (!taskId) return error('taskId is required');

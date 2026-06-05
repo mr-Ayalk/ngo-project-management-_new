@@ -221,6 +221,10 @@ model Report {
   name        String
   description String?
   reportDate  DateTime
+  fileUrl     String?
+  fileName    String?
+  fileType    String?
+  fileSize    String?
   createdAt   DateTime @default(now())
 }
 

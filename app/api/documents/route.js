@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, requireAuth } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
 function formatDocument(d) {
   const projectLabel = d.project?.name || 'All Projects';
@@ -21,6 +22,9 @@ function formatDocument(d) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category');
 
@@ -45,6 +49,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     if (!body?.name) return error('Name is required');
 
@@ -59,6 +67,15 @@ export async function POST(req) {
         projectId: body.projectId || null,
       },
       include: { project: { select: { name: true } } },
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: 'created',
+      entity: 'document',
+      entityId: doc.id,
+      description: `Uploaded document "${doc.name}"`,
+      projectId: doc.projectId || undefined,
     });
 
     return json(formatDocument(doc), 201);

@@ -37,22 +37,27 @@ export default function LoginPage() {
           <div className="login-logo">
             <Image src={logo2} alt="Engage Now Africa" className="login-logo-img" priority />
           </div>
-          <h1 className="login-headline">Project management built for impact.</h1>
+          <h1 className="login-headline">Manage impact.<br />Measure change.</h1>
           <p className="login-tagline">
-            Track projects, budgets, beneficiaries, and team collaboration — all in one place.
+            The complete platform for NGO teams to plan projects, track budgets,
+            manage beneficiaries, and report outcomes — securely and efficiently.
           </p>
           <ul className="login-features">
             <li>
               <span className="login-feature-icon">✓</span>
-              Real-time dashboard &amp; reporting
+              Real-time dashboards &amp; impact reporting
             </li>
             <li>
               <span className="login-feature-icon">✓</span>
-              Budget tracking &amp; donor compliance
+              Donor-compliant budget tracking
             </li>
             <li>
               <span className="login-feature-icon">✓</span>
-              Secure team collaboration
+              Role-based access &amp; audit trails
+            </li>
+            <li>
+              <span className="login-feature-icon">✓</span>
+              Team collaboration &amp; task management
             </li>
           </ul>
         </div>
@@ -63,7 +68,7 @@ export default function LoginPage() {
         <div className="login-form-wrap">
           <div className="login-form-header">
             <h2>Welcome back</h2>
-            <p>Sign in to your account to continue</p>
+            <p>Sign in to your organization workspace</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -121,12 +126,12 @@ export default function LoginPage() {
             </label>
 
             <button type="submit" className="login-submit" disabled={submitting}>
-              {submitting ? 'Signing in…' : 'Sign in'}
+              {submitting ? 'Signing in…' : 'Sign in to workspace'}
             </button>
           </form>
 
           <p className="login-footer-note">
-            NGO Project Management · Engage Now Africa
+            Secured workspace · Engage Now Africa
           </p>
         </div>
       </div>

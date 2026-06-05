@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatMonthYear } from '@/lib/api-utils';
+import { json, error, parseBody, formatMonthYear, requireAuth, requireManager } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
 function formatBeneficiary(b) {
   const statusMap = { active: 'on-track', 'follow-up': 'at-risk', inactive: 'inactive' };
@@ -21,6 +22,9 @@ function formatBeneficiary(b) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const region = searchParams.get('region');
     const search = searchParams.get('search');
@@ -59,6 +63,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     if (!body?.name) return error('Name is required');
 
@@ -74,6 +82,14 @@ export async function POST(req) {
         enrolledDate: body.enrolledDate ? new Date(body.enrolledDate) : new Date(),
         notes: body.notes,
       },
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: 'created',
+      entity: 'beneficiary',
+      entityId: beneficiary.id,
+      description: `Enrolled beneficiary "${beneficiary.name}"`,
     });
 
     return json(formatBeneficiary(beneficiary), 201);

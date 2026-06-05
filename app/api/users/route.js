@@ -3,10 +3,14 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
-import { ROLE_LABELS, isProjectManager, formatUserRole } from '@/lib/roles';
+import { isProjectManager, formatUserRole } from '@/lib/roles';
+import { logAudit, getClientIp } from '@/lib/audit';
 
-export async function GET() {
+export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const users = await prisma.user.findMany({
       select: {
         id: true, name: true, email: true, role: true, staffRole: true,
@@ -56,6 +60,14 @@ export async function POST(req) {
       select: { id: true, name: true, email: true, role: true, staffRole: true, isActive: true },
     });
 
+    await logAudit({
+      userId: auth.user.id,
+      action: 'created',
+      resource: 'user',
+      details: { userId: user.id, email: user.email, role: user.role },
+      ipAddress: getClientIp(req),
+    });
+
     return json({
       ...formatUserRole(user),
       status: 'Active',
@@ -89,6 +101,14 @@ export async function PUT(req) {
       where: { id: body.id },
       data,
       select: { id: true, name: true, email: true, role: true, staffRole: true, isActive: true },
+    });
+
+    await logAudit({
+      userId: auth.user.id,
+      action: 'updated',
+      resource: 'user',
+      details: { userId: user.id, changes: Object.keys(data) },
+      ipAddress: getClientIp(req),
     });
 
     return json({

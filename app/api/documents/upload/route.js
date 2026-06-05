@@ -2,9 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { json, error } from '@/lib/api-utils';
+import { json, error, requireAuth } from '@/lib/api-utils';
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = ['pdf', 'xlsx', 'xls', 'docx', 'doc', 'csv', 'zip', 'png', 'jpg', 'jpeg'];
 
 const EXT_TYPES = {
   pdf: 'PDF',
@@ -36,6 +37,9 @@ function fileIcon(ext) {
 
 export async function POST(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const formData = await req.formData();
     const file = formData.get('file');
 
@@ -47,14 +51,17 @@ export async function POST(req) {
       return error('File must be 10 MB or smaller', 400);
     }
 
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return error(`File type not allowed. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`, 400);
+    }
+
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     await mkdir(uploadDir, { recursive: true });
 
     const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(uploadDir, safeName), buffer);
-
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
     return json({
       url: `/uploads/${safeName}`,

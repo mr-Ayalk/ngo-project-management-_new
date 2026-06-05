@@ -13,15 +13,19 @@ const Sidebar = ({
   pinnedProjects = [],
   onOpenProject,
   myTaskCount = 0,
+  isAdmin = false,
 }) => {
   const { logout } = useAuth();
   const [expandedPins, setExpandedPins] = useState({});
 
-  const menuItems = [
+  const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'projects', label: 'Projects', icon: 'projects' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'budget', label: 'Budget', icon: 'budget' },
+  ];
+
+  const manageNav = [
     { id: 'reports', label: 'Reports', icon: 'reports' },
     { id: 'partners', label: 'Partners', icon: 'partners' },
     { id: 'beneficiaries', label: 'Beneficiaries', icon: 'beneficiaries' },
@@ -33,10 +37,10 @@ const Sidebar = ({
     const icons = {
       dashboard: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="7" height="7"/>
-          <rect x="14" y="3" width="7" height="7"/>
-          <rect x="3" y="14" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
       ),
       projects: (
@@ -55,8 +59,8 @@ const Sidebar = ({
       ),
       budget: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 6v6l4 2"/>
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
         </svg>
       ),
       reports: (
@@ -76,8 +80,10 @@ const Sidebar = ({
       ),
       beneficiaries: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+          <path d="M16 3.13a4 4 0 010 7.75"/>
         </svg>
       ),
       documents: (
@@ -91,13 +97,32 @@ const Sidebar = ({
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
         </svg>
       ),
+      settings: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      ),
     };
     return icons[type] || null;
   };
 
-  const togglePinExpand = (projectId) => {
-    setExpandedPins((prev) => ({ ...prev, [projectId]: !prev[projectId] }));
-  };
+  const renderNavItem = (item) => (
+    <div
+      key={item.id}
+      className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+      onClick={() => onPageChange(item.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onPageChange(item.id)}
+    >
+      {renderIcon(item.icon)}
+      {item.label}
+      {item.id === 'projects' && myTaskCount > 0 && (
+        <span className="nav-badge">{myTaskCount > 99 ? '99+' : myTaskCount}</span>
+      )}
+    </div>
+  );
 
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
@@ -108,32 +133,24 @@ const Sidebar = ({
       {isOpen && (
         <button className="mobile-close" onClick={onClose} aria-label="Close menu">✕</button>
       )}
-      {isOpen && <div className="sidebar-mobile-title">Menu</div>}
+
       <nav className="nav">
-        {menuItems.map((item) => (
-          <div
-            key={item.id}
-            className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
-            onClick={() => onPageChange(item.id)}
-          >
-            {renderIcon(item.icon)}
-            {item.label}
-            {item.id === 'projects' && myTaskCount > 0 && (
-              <span className="nav-badge">{myTaskCount}</span>
-            )}
-          </div>
-        ))}
+        <div className="nav-section-label">Overview</div>
+        {mainNav.map(renderNavItem)}
+
+        <div className="nav-section-label">Manage</div>
+        {manageNav.map(renderNavItem)}
       </nav>
 
       {pinnedProjects.length > 0 && (
         <div className="sidebar-pinned">
-          <div className="sidebar-pinned-label">PROJECTS</div>
+          <div className="sidebar-pinned-label">Pinned Projects</div>
           {pinnedProjects.map((pin) => (
             <div key={pin.projectId} className="sidebar-pinned-item">
               <button
                 type="button"
                 className="sidebar-pinned-toggle"
-                onClick={() => togglePinExpand(pin.projectId)}
+                onClick={() => setExpandedPins((prev) => ({ ...prev, [pin.projectId]: !prev[pin.projectId] }))}
                 aria-label="Expand project"
               >
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="12" height="12"
@@ -148,7 +165,7 @@ const Sidebar = ({
                 onClick={() => onOpenProject?.(pin)}
                 title={pin.name}
               >
-                {pin.name.length > 22 ? `${pin.name.slice(0, 22)}...` : pin.name}
+                {pin.name.length > 22 ? `${pin.name.slice(0, 22)}…` : pin.name}
               </button>
               {expandedPins[pin.projectId] && (
                 <div className="sidebar-pinned-sub">
@@ -163,6 +180,15 @@ const Sidebar = ({
       )}
 
       <div className="sidebar-footer">
+        <div
+          className={`nav-item ${currentPage === 'settings' ? 'active' : ''}`}
+          onClick={() => onPageChange('settings')}
+          role="button"
+          tabIndex={0}
+        >
+          {renderIcon('settings')}
+          Settings
+        </div>
         <button
           type="button"
           className="sidebar-logout"
@@ -176,7 +202,7 @@ const Sidebar = ({
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
-          Log out
+          Sign out
         </button>
       </div>
     </aside>

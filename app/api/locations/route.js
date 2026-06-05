@@ -1,9 +1,12 @@
 export const dynamic = 'force-dynamic';
 
-import { json } from '@/lib/api-utils';
+import { json, requireAuth } from '@/lib/api-utils';
 import { REGIONS, ZONES, TOWNS, KEBELES, WOREDAS, WOREDA_BUDGETS, filterLocations } from '@/lib/ethiopia-locations';
 
 export async function GET(req) {
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type') || 'regions';
   const q = searchParams.get('q') || '';

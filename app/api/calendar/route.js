@@ -1,10 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody } from '@/lib/api-utils';
+import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const year = parseInt(searchParams.get('year') || '2024', 10);
     const month = parseInt(searchParams.get('month') || '5', 10);
@@ -65,6 +68,9 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const body = await parseBody(req);
     if (!body?.title || !body?.date) return error('Title and date are required');
 

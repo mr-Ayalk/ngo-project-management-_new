@@ -1,10 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody } from '@/lib/api-utils';
+import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
+import { logAudit, getClientIp } from '@/lib/audit';
 
-export async function GET() {
+export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const org = await prisma.organization.findFirst();
     if (!org) return json({ name: 'Engage Now Africa', country: 'Ethiopia' });
     return json(org);
@@ -15,6 +19,10 @@ export async function GET() {
 
 export async function PUT(req) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     const existing = await prisma.organization.findFirst();
 
@@ -35,6 +43,14 @@ export async function PUT(req) {
     } else {
       org = await prisma.organization.create({ data: { name: body.name || 'Engage Now Africa', ...data } });
     }
+
+    await logAudit({
+      userId: user.id,
+      action: 'updated',
+      resource: 'organization',
+      details: { organizationId: org.id, changes: Object.keys(data) },
+      ipAddress: getClientIp(req),
+    });
 
     return json(org);
   } catch (err) {

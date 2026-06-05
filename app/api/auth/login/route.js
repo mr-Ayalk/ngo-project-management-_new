@@ -10,8 +10,12 @@ export async function POST(req) {
       return Response.json({ error: 'Missing credentials' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user) return Response.json({ error: 'Invalid credentials' }, { status: 401 });
+
+    if (!user.isActive) {
+      return Response.json({ error: 'Account deactivated. Contact your administrator.' }, { status: 403 });
+    }
 
     const ok = await verifyPassword(password, user.password);
     if (!ok) return Response.json({ error: 'Invalid credentials' }, { status: 401 });

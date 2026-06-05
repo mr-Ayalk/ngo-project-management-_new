@@ -5,6 +5,9 @@ import { json, error, parseBody, timeAgo, getInitials, AVATAR_COLORS, requireAut
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
     const taskId = searchParams.get('taskId');

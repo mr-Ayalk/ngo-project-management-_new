@@ -1,10 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatCurrency } from '@/lib/api-utils';
+import { json, error, parseBody, formatCurrency, requireAuth, requireBudgetAccess } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
-export async function GET() {
+export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const projects = await prisma.project.findMany({
       select: { id: true, name: true, budget: true, spent: true, status: true, icon: true },
       orderBy: { name: 'asc' },
@@ -47,6 +51,10 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const auth = await requireBudgetAccess(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     if (!body?.projectId || !body?.amount) return error('Project and amount are required');
 
@@ -76,6 +84,15 @@ export async function POST(req) {
           ]
         : []),
     ]);
+
+    await logActivity({
+      userId: user.id,
+      action: 'created',
+      entity: 'budget',
+      entityId: body.projectId,
+      description: `Added ${formatCurrency(amount)} expense to ${project.name}`,
+      projectId: body.projectId,
+    });
 
     return json({
       success: true,

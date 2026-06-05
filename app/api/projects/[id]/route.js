@@ -1,10 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate, formatCurrency } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
 export async function GET(req, { params }) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const project = await prisma.project.findUnique({
       where: { id: params.id },
       include: {
@@ -87,6 +91,10 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     const data = {};
     const fields = [
@@ -118,6 +126,15 @@ export async function PUT(req, { params }) {
       }
     }
 
+    await logActivity({
+      userId: user.id,
+      action: 'updated',
+      entity: 'project',
+      entityId: project.id,
+      description: `Updated project "${project.name}"`,
+      projectId: project.id,
+    });
+
     return json(project);
   } catch (err) {
     console.error('Project PUT error:', err);
@@ -127,7 +144,27 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
+    const project = await prisma.project.findUnique({
+      where: { id: params.id },
+      select: { id: true, name: true },
+    });
+    if (!project) return error('Project not found', 404);
+
     await prisma.project.delete({ where: { id: params.id } });
+
+    await logActivity({
+      userId: user.id,
+      action: 'deleted',
+      entity: 'project',
+      entityId: project.id,
+      description: `Deleted project "${project.name}"`,
+      projectId: project.id,
+    });
+
     return json({ success: true });
   } catch (err) {
     console.error('Project DELETE error:', err);

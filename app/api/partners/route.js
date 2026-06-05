@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody } from '@/lib/api-utils';
+import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
 
 function formatPartner(p) {
   return {
@@ -20,6 +20,9 @@ function formatPartner(p) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type');
 
@@ -36,6 +39,9 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+
     const body = await parseBody(req);
     if (!body?.name || !body?.type) return error('Name and type are required');
 

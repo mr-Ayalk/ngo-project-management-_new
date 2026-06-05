@@ -1,10 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, requireAuth, requireManager } from '@/lib/api-utils';
 
-export async function GET() {
+export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const reports = await prisma.report.findMany({ orderBy: { reportDate: 'desc' } });
     return json(
       reports.map((r) => ({
@@ -13,6 +16,10 @@ export async function GET() {
         description: r.description,
         date: formatDate(r.reportDate),
         reportDate: r.reportDate,
+        fileUrl: r.fileUrl,
+        fileName: r.fileName,
+        fileType: r.fileType,
+        fileSize: r.fileSize,
       }))
     );
   } catch (err) {
@@ -22,6 +29,9 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+
     const body = await parseBody(req);
     if (!body?.name) return error('Name is required');
 
@@ -30,6 +40,10 @@ export async function POST(req) {
         name: body.name,
         description: body.description,
         reportDate: body.reportDate ? new Date(body.reportDate) : new Date(),
+        fileUrl: body.fileUrl || null,
+        fileName: body.fileName || null,
+        fileType: body.fileType || null,
+        fileSize: body.fileSize || null,
       },
     });
 

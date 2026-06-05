@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody } from '@/lib/api-utils';
+import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
 const COLUMN_MAP = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 
@@ -26,6 +27,9 @@ function formatTask(t) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
     const projectId = searchParams.get('projectId');
@@ -67,6 +71,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     if (!body?.title || !body?.projectId) return error('Title and project are required');
 
@@ -84,6 +92,16 @@ export async function POST(req) {
         project: { select: { name: true } },
         assignee: { select: { id: true, name: true } },
       },
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: 'created',
+      entity: 'task',
+      entityId: task.id,
+      description: `Created task "${task.title}"`,
+      projectId: task.projectId,
+      taskId: task.id,
     });
 
     return json(formatTask(task), 201);

@@ -82,7 +82,9 @@ function KanbanBoard({ tasks, draggedTask, dropTarget, onDragStart, onDragOver, 
 const DOC_CATEGORIES = ['all', 'reports', 'budget', 'data', 'contracts', 'media', 'training', 'feedback'];
 
 const DashboardPages = ({
-  currentPage, onNavigate, globalSearch,
+  currentPage, onNavigate,
+  topbarSearch = '',
+  onTopbarSearchSync,
   pinnedProjects = [], onPinsChange, pendingNav, onPendingNavHandled,
 }) => {
   const { user } = useAuth();
@@ -106,6 +108,7 @@ const DashboardPages = ({
   const [partners, setPartners] = useState([]);
   const [organization, setOrganization] = useState(null);
   const [users, setUsers] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [messages, setMessages] = useState(null);
   const [activities, setActivities] = useState([]);
 
@@ -148,6 +151,8 @@ const DashboardPages = ({
   const fileInputRef = useRef(null);
   const [partnerForm, setPartnerForm] = useState(EMPTY_PARTNER);
   const [reportForm, setReportForm] = useState(EMPTY_REPORT);
+  const [reportFile, setReportFile] = useState(null);
+  const reportFileInputRef = useRef(null);
   const [viewReport, setViewReport] = useState(null);
   const [viewDocument, setViewDocument] = useState(null);
   const [editUser, setEditUser] = useState(null);
@@ -166,7 +171,9 @@ const DashboardPages = ({
     setViewDocument(null);
     setEditUser(null);
     setDocumentFile(null);
+    setReportFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (reportFileInputRef.current) reportFileInputRef.current.value = '';
   };
 
   const loadLookup = useCallback(async () => {
@@ -238,6 +245,15 @@ const DashboardPages = ({
             fiscalYearStart: org.fiscalYearStart || 'July',
           });
           setUsers(userList);
+          if (user?.role === 'admin') {
+            try {
+              setAuditLogs(await api.auditLogs());
+            } catch {
+              setAuditLogs([]);
+            }
+          } else {
+            setAuditLogs([]);
+          }
           break;
         }
         default:
@@ -287,10 +303,22 @@ const DashboardPages = ({
   }, [currentPage]);
 
   useEffect(() => {
-    if (globalSearch) {
-      setProjectSearch(globalSearch);
+    if (currentPage === 'projects') {
+      setProjectSearch(topbarSearch);
+    } else if (currentPage === 'beneficiaries') {
+      setBeneSearch(topbarSearch);
     }
-  }, [globalSearch]);
+  }, [topbarSearch]);
+
+  useEffect(() => {
+    if (currentPage === 'projects') {
+      onTopbarSearchSync?.(projectSearch);
+    } else if (currentPage === 'beneficiaries') {
+      onTopbarSearchSync?.(beneSearch);
+    } else {
+      onTopbarSearchSync?.('');
+    }
+  }, [currentPage]);
 
   useEffect(() => {
     if (!pendingNav?.projectId) return;
@@ -717,18 +745,30 @@ const DashboardPages = ({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.createReport(reportForm);
+      let fileData = {};
+      if (reportFile) {
+        const uploaded = await api.uploadDocumentFile(reportFile);
+        fileData = {
+          fileUrl: uploaded.url,
+          fileName: uploaded.name,
+          fileType: uploaded.fileType,
+          fileSize: uploaded.size,
+        };
+      }
+      await api.createReport({ ...reportForm, ...fileData });
       showToast('Report created');
       closeModal();
       loadPageData();
-      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
-        loadProjectTasks(selectedProject.id);
-      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleReportFileSelect = (file) => {
+    if (!file) return;
+    setReportFile(file);
   };
 
   const handleSaveOrg = async () => {
@@ -821,6 +861,14 @@ const DashboardPages = ({
   };
 
   const downloadReport = (report) => {
+    if (report.fileUrl && report.fileUrl !== '#') {
+      const a = document.createElement('a');
+      a.href = report.fileUrl;
+      a.download = report.fileName || report.name;
+      a.click();
+      showToast('Report downloaded');
+      return;
+    }
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -863,6 +911,8 @@ const DashboardPages = ({
     showToast('Document downloaded');
   };
 
+  const firstName = user?.name?.split(' ')[0] || 'there';
+
   if (loading && !dashboard && !projects.length && !budget && !beneficiaries) {
     return <Loading />;
   }
@@ -876,7 +926,7 @@ const DashboardPages = ({
         <>
           <div className="page-header">
             <h1>Dashboard</h1>
-            <p>Welcome back, Grace! Here&apos;s what&apos;s happening with your projects.</p>
+            <p>Welcome back, {firstName}! ✋ Here&apos;s what&apos;s happening with your projects.</p>
           </div>
           <div className="kpi-grid">
             <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('projects')}>
@@ -984,7 +1034,7 @@ const DashboardPages = ({
             <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
               <option value="all">All Status</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option>
             </select>
-            <input className="search-inline" type="text" placeholder="Search projects..." value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
+            <input className="search-inline" type="text" placeholder="Search projects..." value={projectSearch} onChange={(e) => { setProjectSearch(e.target.value); onTopbarSearchSync?.(e.target.value); }} />
           </div>
           {loading ? <Loading /> : (
             <div className="projects-table">
@@ -1244,7 +1294,7 @@ const DashboardPages = ({
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Reports</h1></div>
-            <button className="btn-primary" onClick={() => { setReportForm(EMPTY_REPORT); setModal('report'); }}>+ New Report</button>
+            <button className="btn-primary" onClick={() => { setReportForm(EMPTY_REPORT); setReportFile(null); setModal('report'); }}>+ New Report</button>
           </div>
           <div className="reports-grid">
             {reports.map((report) => (
@@ -1276,7 +1326,7 @@ const DashboardPages = ({
               <option value="all">All Regions</option>
               {beneficiaries.regions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input className="search-inline" type="text" placeholder="Search beneficiaries..." value={beneSearch} onChange={(e) => setBeneSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && loadPageData()} />
+            <input className="search-inline" type="text" placeholder="Search beneficiaries..." value={beneSearch} onChange={(e) => { setBeneSearch(e.target.value); onTopbarSearchSync?.(e.target.value); }} onKeyDown={(e) => e.key === 'Enter' && loadPageData()} />
           </div>
           <div className="bene-table">
             <div className="bene-table-head"><span>Name</span><span>Program</span><span>Region</span><span>Status</span><span>Enrolled</span></div>
@@ -1375,9 +1425,15 @@ const DashboardPages = ({
               {messages?.messages?.length ? messages.messages.map((msg) => (
                 <div key={msg.id} className="message-bubble">
                   <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>
-                  <div><div style={{ fontSize: '12px', fontWeight: '600' }}>{msg.senderName} <span style={{ fontWeight: 400, color: 'var(--gray-400)', fontSize: '10px' }}>{msg.time}</span></div><div style={{ fontSize: '13px', marginTop: '2px' }}>{msg.content}</div></div>
+                  <div className="msg-body">
+                    <div className="msg-sender">
+                      {msg.senderName}
+                      <span className="msg-time">{msg.time}</span>
+                    </div>
+                    <div className="msg-content">{msg.content}</div>
+                  </div>
                 </div>
-              )) : <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>{msgProjectId && msgTaskId ? 'No messages yet. Start the discussion!' : 'Select a project and task above to view messages.'}</p>}
+              )) : <p className="messages-empty">{msgProjectId && msgTaskId ? 'No messages yet. Start the discussion!' : 'Select a project and task above to view messages.'}</p>}
             </div>
             <form className="message-compose" onSubmit={handleSendMessage}>
               <input type="text" placeholder="Write a message about this task..." value={messageInput} onChange={(e) => setMessageInput(e.target.value)} disabled={!msgProjectId || !msgTaskId} />
@@ -1390,7 +1446,10 @@ const DashboardPages = ({
       {/* ── SETTINGS ── */}
       {currentPage === 'settings' && organization && (
         <>
-          <div style={{ marginBottom: '16px' }}><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Settings</h1></div>
+          <div className="page-header">
+            <h1>Settings</h1>
+            <p>Manage your organization profile, team access, and security preferences.</p>
+          </div>
           <div className="settings-grid">
             <div className="settings-card">
               <div className="settings-card-title">Organization Info</div>
@@ -1458,6 +1517,32 @@ const DashboardPages = ({
                   {users.map((u) => (
                     <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
                       <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {user?.role === 'admin' && auditLogs.length > 0 && (
+              <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
+                <div className="settings-card-title">Security Audit Log</div>
+                <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>
+                  Recent administrative actions across your organization (last 100 entries).
+                </p>
+                <div className="audit-log-table">
+                  <div className="audit-log-row audit-log-head">
+                    <span>Time</span>
+                    <span>Action</span>
+                    <span>Resource</span>
+                    <span>User</span>
+                    <span>IP</span>
+                  </div>
+                  {auditLogs.map((log) => (
+                    <div key={log.id} className="audit-log-row">
+                      <span>{new Date(log.createdAt).toLocaleString()}</span>
+                      <span className="audit-action">{log.action}</span>
+                      <span>{log.resource}</span>
+                      <span>{log.userName}</span>
+                      <span style={{ color: 'var(--gray-400)' }}>{log.ipAddress || '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -1608,6 +1693,37 @@ const DashboardPages = ({
           <div className="form-field"><label>Name *</label><input required value={reportForm.name} onChange={(e) => setReportForm({ ...reportForm, name: e.target.value })} /></div>
           <div className="form-field"><label>Description</label><textarea value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} /></div>
           <div className="form-field"><label>Date</label><input type="date" value={reportForm.reportDate} onChange={(e) => setReportForm({ ...reportForm, reportDate: e.target.value })} /></div>
+          <div className="form-field">
+            <label>Attach File (optional)</label>
+            <input
+              ref={reportFileInputRef}
+              type="file"
+              className="file-input-hidden"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.png,.jpg,.jpeg"
+              onChange={(e) => handleReportFileSelect(e.target.files?.[0])}
+            />
+            <div
+              className={`file-drop-zone${reportFile ? ' has-file' : ''}`}
+              onClick={() => reportFileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+              onDragLeave={(e) => e.currentTarget.classList.remove('drag-over')}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                handleReportFileSelect(e.dataTransfer.files?.[0]);
+              }}
+            >
+              <div className="file-drop-icon">📄</div>
+              {reportFile ? (
+                <div className="file-drop-selected">
+                  <span className="file-drop-name">{reportFile.name}</span>
+                  <button type="button" className="file-drop-remove" onClick={(e) => { e.stopPropagation(); setReportFile(null); if (reportFileInputRef.current) reportFileInputRef.current.value = ''; }}>Remove</button>
+                </div>
+              ) : (
+                <p className="file-drop-hint">Click or drag a file here (PDF, DOCX, XLSX, CSV, images)</p>
+              )}
+            </div>
+          </div>
           <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Create Report</button></div>
         </form>
       </Modal>
@@ -1616,8 +1732,13 @@ const DashboardPages = ({
         {viewReport && (<>
           <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>{viewReport.date}</p>
           <p style={{ fontSize: '13px', color: 'var(--gray-700)' }}>{viewReport.description || 'No description provided.'}</p>
+          {viewReport.fileName && (
+            <p style={{ fontSize: '13px', marginTop: '12px', color: 'var(--gray-600)' }}>
+              Attached: {viewReport.fileName} {viewReport.fileSize ? `(${viewReport.fileSize})` : ''}
+            </p>
+          )}
           <div className="report-actions">
-            <button onClick={() => downloadReport(viewReport)}>Download</button>
+            <button onClick={() => downloadReport(viewReport)}>Download{viewReport.fileUrl ? ' File' : ''}</button>
             <button onClick={() => shareReport(viewReport)}>Share</button>
           </div>
         </>)}

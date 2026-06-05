@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate, formatCurrency } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
+import { logActivity } from '@/lib/activity';
 
 function formatProject(p) {
   return {
@@ -47,6 +48,9 @@ function formatProject(p) {
 
 export async function GET(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
@@ -74,6 +78,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auth = await requireManager(req);
+    if (auth.error) return auth.error;
+    const user = auth.user;
+
     const body = await parseBody(req);
     if (!body?.name || !body?.managerId) return error('Name and manager are required');
 
@@ -118,6 +126,15 @@ export async function POST(req) {
         lead: { select: { id: true, name: true } },
         members: { include: { user: { select: { id: true, name: true, staffRole: true } } } },
       },
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: 'created',
+      entity: 'project',
+      entityId: project.id,
+      description: `Created project "${project.name}"`,
+      projectId: project.id,
     });
 
     return json(formatProject(project), 201);

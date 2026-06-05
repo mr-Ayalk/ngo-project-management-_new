@@ -8,12 +8,14 @@ import Topbar from '../components/Topbar';
 import DashboardPages from '../components/DashboardPages';
 import api from '@/lib/api';
 
+const SEARCHABLE_PAGES = ['projects', 'beneficiaries'];
+
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState('');
+  const [topbarSearch, setTopbarSearch] = useState('');
   const [pinnedProjects, setPinnedProjects] = useState([]);
   const [pendingNav, setPendingNav] = useState(null);
 
@@ -36,11 +38,14 @@ export default function DashboardPage() {
     if (user) loadPins();
   }, [user, loadPins]);
 
-  const handleGlobalSearch = (query) => {
-    setGlobalSearch(query);
-    if (query.trim()) {
-      setCurrentPage('projects');
-    }
+  const handlePageChange = (page) => {
+    setTopbarSearch('');
+    setCurrentPage(page);
+    setSidebarOpen(false);
+  };
+
+  const handleTopbarSearch = (query) => {
+    setTopbarSearch(query);
   };
 
   const handleOpenPinnedProject = (pin) => {
@@ -68,19 +73,22 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="login-loading">
+      <div className="app-loading">
         <div className="login-spinner" />
+        <p className="app-loading-text">Loading your workspace…</p>
       </div>
     );
   }
 
   if (!user) return null;
 
+  const searchEnabled = SEARCHABLE_PAGES.includes(currentPage);
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
         currentPage={currentPage}
-        onPageChange={(p) => { setCurrentPage(p); setSidebarOpen(false); }}
+        onPageChange={handlePageChange}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         pinnedProjects={pinnedProjects}
@@ -89,15 +97,24 @@ export default function DashboardPage() {
       <div className="main-container">
         <Topbar
           onMenuToggle={() => setSidebarOpen((s) => !s)}
-          onSearch={handleGlobalSearch}
-          searchQuery={globalSearch}
+          onSearch={handleTopbarSearch}
+          searchQuery={searchEnabled ? topbarSearch : ''}
+          searchEnabled={searchEnabled}
+          searchPlaceholder={
+            currentPage === 'beneficiaries'
+              ? 'Search beneficiaries...'
+              : currentPage === 'projects'
+                ? 'Search projects...'
+                : 'Search...'
+          }
           onOpenSettings={handleOpenSettings}
           onOpenNotification={handleOpenNotification}
         />
         <DashboardPages
           currentPage={currentPage}
-          onNavigate={setCurrentPage}
-          globalSearch={globalSearch}
+          onNavigate={handlePageChange}
+          topbarSearch={topbarSearch}
+          onTopbarSearchSync={setTopbarSearch}
           pinnedProjects={pinnedProjects}
           onPinsChange={loadPins}
           pendingNav={pendingNav}
