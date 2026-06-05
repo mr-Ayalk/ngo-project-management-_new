@@ -8,24 +8,29 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  name          String
-  password      String
-  avatar        String?
-  role          String         @default("staff")
-  isActive      Boolean        @default(true)
-  lastLogin     DateTime?
-  joinedDate    DateTime       @default(now())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  activities    Activity[]
-  auditLogs     AuditLog[]
-  messages      Message[]      @relation("MessageSender")
-  notifications Notification[]
-  payments      Payment[]      @relation("PaymentUser")
-  projects      Project[]      @relation("ProjectManager")
-  tasks         Task[]         @relation("TaskAssignee")
+  id               String          @id @default(cuid())
+  email            String          @unique
+  name             String
+  password         String
+  avatar           String?
+  role             String          @default("staff")
+  staffRole        String?
+  isActive         Boolean         @default(true)
+  lastLogin        DateTime?
+  joinedDate       DateTime        @default(now())
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  activities       Activity[]
+  auditLogs        AuditLog[]
+  messages         Message[]       @relation("MessageSender")
+  notifications    Notification[]
+  payments         Payment[]       @relation("PaymentUser")
+  projects         Project[]       @relation("ProjectManager")
+  ledProjects      Project[]       @relation("ProjectLead")
+  tasks            Task[]          @relation("TaskAssignee")
+  projectMembers   ProjectMember[]
+  pinnedProjects   PinnedProject[]
+  taskComments     TaskComment[]   @relation("CommentSender")
 }
 
 model Organization {
@@ -36,6 +41,9 @@ model Organization {
   country                String?
   location               String?
   description            String?
+  dateFormat             String   @default("DD/MM/YYYY")
+  timezone               String   @default("Africa/Addis_Ababa")
+  fiscalYearStart        String   @default("July")
   totalBeneficiaries     Int      @default(0)
   childrenCount          Int      @default(0)
   womenFamiliesCount     Int      @default(0)
@@ -47,44 +55,100 @@ model Organization {
 }
 
 model Project {
-  id             String               @id @default(cuid())
-  name           String
-  description    String?
-  status         String               @default("on-track")
-  icon           String               @default("green")
-  startDate      DateTime
-  endDate        DateTime
-  budget         Float
-  spent          Float                @default(0)
-  progress       Int                  @default(0)
-  location       String?
-  donor          String?
-  managerId      String
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  activities     Activity[]
-  beneficiaries  BeneficiaryProject[]
-  budgets        Budget[]
-  calendarEvents CalendarEvent[]
-  documents      Document[]
-  manager        User                 @relation("ProjectManager", fields: [managerId], references: [id])
-  tasks          Task[]
+  id                   String               @id @default(cuid())
+  name                 String
+  description          String?
+  status               String               @default("on-track")
+  icon                 String               @default("green")
+  startDate            DateTime
+  endDate              DateTime
+  budget               Float
+  spent                Float                @default(0)
+  progress             Int                  @default(0)
+  location             String?
+  donor                String?
+  donorName            String?
+  assumptions          String?              @db.Text
+  risks                String?              @db.Text
+  indicators           String?              @db.Text
+  outcomes             String?              @db.Text
+  income               Float                @default(0)
+  locationType         String?
+  region               String?
+  zone                 String?
+  town                 String?
+  kebele               String?
+  woreda               String?
+  woredaBudget         Float?
+  mitigationStrategies String?              @db.Text
+  managerId            String
+  leadId               String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  activities           Activity[]
+  beneficiaries        BeneficiaryProject[]
+  budgets              Budget[]
+  calendarEvents       CalendarEvent[]
+  documents            Document[]
+  manager              User                 @relation("ProjectManager", fields: [managerId], references: [id])
+  lead                 User?                @relation("ProjectLead", fields: [leadId], references: [id])
+  members              ProjectMember[]
+  pinnedBy             PinnedProject[]
+  comments             TaskComment[]
+  tasks                Task[]
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model PinnedProject {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
 }
 
 model Task {
-  id          String     @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String?
-  status      String     @default("todo")
-  priority    String     @default("medium")
+  status      String        @default("todo")
+  priority    String        @default("medium")
   dueDate     DateTime?
   projectId   String
   assigneeId  String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   activities  Activity[]
-  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments    TaskComment[]
+  assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  content   String
+  taskId    String
+  projectId String
+  senderId  String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender    User     @relation("CommentSender", fields: [senderId], references: [id])
 }
 
 model Beneficiary {
@@ -179,6 +243,8 @@ model Message {
   senderId    String
   recipientId String?
   groupId     String?
+  projectId   String?
+  taskId      String?
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
   sender      User     @relation("MessageSender", fields: [senderId], references: [id])
@@ -205,6 +271,9 @@ model Notification {
   title     String
   message   String
   type      String?
+  projectId String?
+  taskId    String?
+  linkType  String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -5,6 +5,11 @@ import Chart from 'chart.js/auto';
 import api from '@/lib/api';
 import Modal from '@/components/Modal';
 import Toast from '@/components/Toast';
+import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
+import TaskDetailView from '@/components/TaskDetailView';
+import { useAuth } from '@/components/AuthProvider';
+import { isProjectManager, canManageUsers, STAFF_ROLES } from '@/lib/roles';
+import { formatBudgetInput } from '@/lib/ethiopia-locations';
 
 function Loading() {
   return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>Loading...</div>;
@@ -14,7 +19,7 @@ function ErrorMsg({ message }) {
   return <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444', fontSize: '13px' }}>{message || 'Failed to load data.'}</div>;
 }
 
-const EMPTY_PROJECT = { name: '', description: '', status: 'on-track', icon: 'green', budget: '', startDate: '', endDate: '', donor: '', managerId: '' };
+const EMPTY_PROJECT = EMPTY_PROJECT_FORM;
 const EMPTY_TASK = { title: '', projectId: '', priority: 'medium', status: 'todo', dueDate: '' };
 const EMPTY_EVENT = { title: '', date: '', time: '', color: 'green', allDay: false, projectId: '' };
 const EMPTY_EXPENSE = { projectId: '', amount: '', category: 'operations' };
@@ -76,7 +81,12 @@ function KanbanBoard({ tasks, draggedTask, dropTarget, onDragStart, onDragOver, 
 
 const DOC_CATEGORIES = ['all', 'reports', 'budget', 'data', 'contracts', 'media', 'training', 'feedback'];
 
-const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
+const DashboardPages = ({
+  currentPage, onNavigate, globalSearch,
+  pinnedProjects = [], onPinsChange, pendingNav, onPendingNavHandled,
+}) => {
+  const { user } = useAuth();
+  const isManager = isProjectManager(user);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
@@ -113,7 +123,16 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
   const [beneRegion, setBeneRegion] = useState('all');
   const [beneSearch, setBeneSearch] = useState('');
   const [docCategory, setDocCategory] = useState('all');
-  const [orgForm, setOrgForm] = useState({ name: '', country: '', email: '', phone: '', location: '', description: '' });
+  const [orgForm, setOrgForm] = useState({
+    name: '', country: '', email: '', phone: '', location: '', description: '',
+    dateFormat: 'DD/MM/YYYY', timezone: 'Africa/Addis_Ababa', fiscalYearStart: 'July',
+  });
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [msgProjectId, setMsgProjectId] = useState('');
+  const [msgTaskId, setMsgTaskId] = useState('');
+  const [msgTasks, setMsgTasks] = useState([]);
+  const [newStaffForm, setNewStaffForm] = useState({ name: '', email: '', password: '', staffRole: 'field_worker' });
+  const [isPinned, setIsPinned] = useState(false);
 
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
@@ -214,6 +233,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
             phone: org.phone || '',
             location: org.location || '',
             description: org.description || '',
+            dateFormat: org.dateFormat || 'DD/MM/YYYY',
+            timezone: org.timezone || 'Africa/Addis_Ababa',
+            fiscalYearStart: org.fiscalYearStart || 'July',
           });
           setUsers(userList);
           break;
@@ -248,6 +270,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
     setSelectedProject(null);
     setProjectDetail(null);
     setProjectTasks(null);
+    setSelectedTask(null);
     setActiveTab('overview');
   };
 
@@ -268,6 +291,32 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
       setProjectSearch(globalSearch);
     }
   }, [globalSearch]);
+
+  useEffect(() => {
+    if (!pendingNav?.projectId) return;
+    const openPending = async () => {
+      try {
+        const proj = await api.project(pendingNav.projectId);
+        setSelectedProject({ id: proj.id, name: proj.name, status: proj.status, icon: proj.icon, progress: proj.progress, budget: proj.budget });
+        setProjectView('detail');
+        setActiveTab(pendingNav.tab || 'tasks');
+        if (pendingNav.taskId && proj.tasks) {
+          const task = proj.tasks.find((t) => t.id === pendingNav.taskId);
+          if (task) setSelectedTask(task);
+        }
+        onPendingNavHandled?.();
+      } catch {
+        onPendingNavHandled?.();
+      }
+    };
+    openPending();
+  }, [pendingNav, onPendingNavHandled]);
+
+  useEffect(() => {
+    if (selectedProject?.id) {
+      setIsPinned(pinnedProjects.some((p) => p.projectId === selectedProject.id));
+    }
+  }, [selectedProject, pinnedProjects]);
 
   useEffect(() => {
     if (selectedProject?.id) {
@@ -317,22 +366,42 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
 
   const openProjectModal = async (project = null) => {
     const data = await loadLookup();
-    const defaultManager = data.users.find((u) => u.role === 'manager') || data.users[0];
+    const defaultManager = data.users.find((u) => ['manager', 'project_manager', 'admin'].includes(u.role)) || data.users[0];
     if (project) {
+      let detail = project;
+      if (project.id && !project.assumptions) {
+        try { detail = await api.project(project.id); } catch { /* use list data */ }
+      }
       setProjectForm({
-        id: project.id,
-        name: project.name,
-        description: project.description || '',
-        status: project.status,
-        icon: project.icon,
-        budget: project.budgetRaw || '',
-        startDate: project.startDate ? new Date(project.startDate).toISOString().slice(0, 10) : '',
-        endDate: project.endDate ? new Date(project.endDate).toISOString().slice(0, 10) : '',
-        donor: project.donor || '',
-        managerId: project.manager?.id || defaultManager?.id || '',
+        id: detail.id,
+        name: detail.name,
+        description: detail.description || '',
+        status: detail.status,
+        icon: detail.icon,
+        budget: detail.budgetRaw ? formatBudgetInput(detail.budgetRaw) : '',
+        income: detail.income ? formatBudgetInput(detail.income) : '',
+        startDate: detail.startDate ? new Date(detail.startDate).toISOString().slice(0, 10) : '',
+        endDate: detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : '',
+        donor: detail.donor || '',
+        donorName: detail.donorName || detail.donor || '',
+        managerId: detail.managerId || detail.manager?.id || defaultManager?.id || '',
+        leadId: detail.leadId || '',
+        assumptions: detail.assumptions || '',
+        risks: detail.risks || '',
+        indicators: detail.indicators || '',
+        outcomes: detail.outcomes || '',
+        mitigationStrategies: detail.mitigationStrategies || '',
+        locationType: detail.locationType || '',
+        region: detail.region || '',
+        zone: detail.zone || '',
+        town: detail.town || '',
+        kebele: detail.kebele || '',
+        woreda: detail.woreda || '',
+        woredaBudget: detail.woredaBudget ? formatBudgetInput(detail.woredaBudget) : '',
+        memberIds: detail.members?.map((m) => m.id) || [],
       });
     } else {
-      setProjectForm({ ...EMPTY_PROJECT, managerId: defaultManager?.id || '' });
+      setProjectForm({ ...EMPTY_PROJECT, managerId: defaultManager?.id || '', leadId: defaultManager?.id || '' });
     }
     setModal('project');
   };
@@ -359,6 +428,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
 
   const handleSaveProject = async (e) => {
     e.preventDefault();
+    if (!isManager) { showToast('Only project managers can create projects', 'error'); return; }
     setSubmitting(true);
     try {
       const body = {
@@ -366,11 +436,27 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
         description: projectForm.description,
         status: projectForm.status,
         icon: projectForm.icon,
-        budget: parseFloat(projectForm.budget) || 0,
+        budget: parseBudgetInput(projectForm.budget),
+        income: parseBudgetInput(projectForm.income),
         startDate: projectForm.startDate || new Date().toISOString(),
         endDate: projectForm.endDate || new Date().toISOString(),
-        donor: projectForm.donor,
+        donor: projectForm.donorName || projectForm.donor,
+        donorName: projectForm.donorName || projectForm.donor,
         managerId: projectForm.managerId,
+        leadId: projectForm.leadId || projectForm.managerId,
+        assumptions: projectForm.assumptions,
+        risks: projectForm.risks,
+        indicators: projectForm.indicators,
+        outcomes: projectForm.outcomes,
+        mitigationStrategies: projectForm.mitigationStrategies,
+        locationType: projectForm.locationType,
+        region: projectForm.region,
+        zone: projectForm.zone,
+        town: projectForm.town,
+        kebele: projectForm.kebele,
+        woreda: projectForm.woreda,
+        woredaBudget: parseBudgetInput(projectForm.woredaBudget),
+        memberIds: projectForm.memberIds || [],
       };
       if (projectForm.id) {
         await api.updateProject(projectForm.id, body);
@@ -381,10 +467,42 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
       }
       closeModal();
       loadPageData();
-      if (projectView === 'detail' && selectedProject?.id && activeTab === 'tasks') {
-        loadProjectTasks(selectedProject.id);
+      if (projectView === 'detail' && selectedProject?.id) {
+        api.project(selectedProject.id).then(setProjectDetail);
       }
       if (currentPage === 'dashboard') api.dashboard().then(setDashboard);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTogglePin = async () => {
+    if (!selectedProject?.id) return;
+    try {
+      if (isPinned) {
+        await api.unpinProject(selectedProject.id);
+        showToast('Project unpinned');
+      } else {
+        await api.pinProject(selectedProject.id);
+        showToast('Project pinned to sidebar');
+      }
+      onPinsChange?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.createUser({ ...newStaffForm, role: 'staff' });
+      showToast('Staff member added');
+      setNewStaffForm({ name: '', email: '', password: '', staffRole: 'field_worker' });
+      const userList = await api.users();
+      setUsers(userList);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -630,7 +748,7 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.updateUser({ id: editUser.id, name: editUser.name, role: editUser.role, isActive: editUser.isActive });
+      await api.updateUser({ id: editUser.id, name: editUser.name, role: editUser.role, staffRole: editUser.staffRole, isActive: editUser.isActive });
       showToast('User updated');
       closeModal();
       loadPageData();
@@ -647,18 +765,49 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
-    const sender = lookup.users[0];
-    if (!sender) { showToast('No users found', 'error'); return; }
+    if (!msgProjectId || !msgTaskId) {
+      showToast('Please select a project and task first', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.sendMessage({ content: messageInput, senderId: sender.id });
+      await api.sendMessage({
+        content: messageInput,
+        projectId: msgProjectId,
+        taskId: msgTaskId,
+      });
       setMessageInput('');
-      setMessages(await api.messages());
+      setMessages(await api.messages({ projectId: msgProjectId, taskId: msgTaskId }));
       showToast('Message sent');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const loadTaskMessages = useCallback(async (projectId, taskId) => {
+    if (!projectId || !taskId) return;
+    try {
+      setMessages(await api.messages({ projectId, taskId }));
+    } catch {
+      setMessages({ messages: [] });
+    }
+  }, []);
+
+  const handleMsgProjectChange = async (projectId) => {
+    setMsgProjectId(projectId);
+    setMsgTaskId('');
+    setMessages({ messages: [] });
+    if (projectId) {
+      try {
+        const detail = await api.project(projectId);
+        setMsgTasks(detail.tasks || []);
+      } catch {
+        setMsgTasks([]);
+      }
+    } else {
+      setMsgTasks([]);
     }
   };
 
@@ -827,7 +976,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
         <>
           <div className="projects-topbar">
             <div><h1>Projects</h1><p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>Manage and track all your projects.</p></div>
-            <button className="btn-primary" onClick={() => openProjectModal()}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>
+            {isManager && (
+              <button className="btn-primary" onClick={() => openProjectModal()}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>
+            )}
           </div>
           <div className="filter-row">
             <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
@@ -850,8 +1001,15 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
                     {menuOpen === proj.id && (
                       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => { openProjectDetail(proj); setMenuOpen(null); }}>View</button>
-                        <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>
-                        <button className="danger" onClick={() => handleDeleteProject(proj.id)}>Delete</button>
+                        {isManager && <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>}
+                        <button onClick={async () => {
+                          const pinned = pinnedProjects.some((p) => p.projectId === proj.id);
+                          if (pinned) await api.unpinProject(proj.id); else await api.pinProject(proj.id);
+                          onPinsChange?.();
+                          setMenuOpen(null);
+                          showToast(pinned ? 'Unpinned' : 'Pinned to sidebar');
+                        }}>{pinnedProjects.some((p) => p.projectId === proj.id) ? 'Unpin' : 'Pin to Sidebar'}</button>
+                        {isManager && <button className="danger" onClick={() => handleDeleteProject(proj.id)}>Delete</button>}
                       </div>
                     )}
                   </span>
@@ -862,7 +1020,23 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
         </>
       )}
 
-      {currentPage === 'projects' && projectView === 'detail' && selectedProject && projectDetail && (
+      {currentPage === 'projects' && projectView === 'detail' && selectedProject && projectDetail && selectedTask && (
+        <TaskDetailView
+          task={selectedTask}
+          project={{
+            id: selectedProject.id,
+            name: projectDetail.name,
+            status: selectedProject.status,
+            progress: selectedProject.progress,
+            startDate: projectDetail.startDate,
+          }}
+          currentUser={user}
+          onBack={() => setSelectedTask(null)}
+          onNotify={() => {}}
+        />
+      )}
+
+      {currentPage === 'projects' && projectView === 'detail' && selectedProject && projectDetail && !selectedTask && (
         <div className="project-detail-page">
           <button type="button" className="project-detail-back" onClick={closeProjectDetail}>
             ← Back to Projects
@@ -873,7 +1047,10 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
               <p>{projectDetail.description}</p>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <button className="btn-secondary" onClick={() => openProjectModal(selectedProject)}>Edit Project</button>
+              <button className={`btn-secondary pin-btn${isPinned ? ' pinned' : ''}`} onClick={handleTogglePin}>
+                {isPinned ? '★ Pinned' : '☆ Pin Project'}
+              </button>
+              {isManager && <button className="btn-secondary" onClick={() => openProjectModal(selectedProject)}>Edit Project</button>}
               {activeTab === 'tasks' && (
                 <button className="btn-primary" onClick={() => openTaskModal({ projectId: selectedProject.id, project: selectedProject.name })}>
                   + New Task
@@ -895,14 +1072,40 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="project-detail-overview">
-              <div className="project-detail-stat"><label>Status</label><span><span className={`status-badge ${selectedProject.status}`}><span className="status-dot"></span>{statusLabel(selectedProject.status)}</span></span></div>
-              <div className="project-detail-stat"><label>Manager</label><span>{projectDetail.manager}</span></div>
-              <div className="project-detail-stat"><label>Progress</label><span>{selectedProject.progress}%</span></div>
-              <div className="project-detail-stat"><label>Budget</label><span>{projectDetail.spent} / {selectedProject.budget}</span></div>
-              <div className="project-detail-stat"><label>Utilization</label><span>{projectDetail.utilization}</span></div>
-              <div className="project-detail-stat"><label>Due Date</label><span>{projectDetail.dueDate}</span></div>
-            </div>
+            <>
+              <div className="project-detail-overview">
+                <div className="project-detail-stat"><label>Status</label><span><span className={`status-badge ${selectedProject.status}`}><span className="status-dot"></span>{statusLabel(selectedProject.status)}</span></span></div>
+                <div className="project-detail-stat"><label>Manager</label><span>{projectDetail.manager}</span></div>
+                <div className="project-detail-stat"><label>Project Lead</label><span>{projectDetail.lead || projectDetail.manager}</span></div>
+                <div className="project-detail-stat"><label>Donor</label><span>{projectDetail.donorName || '—'}</span></div>
+                <div className="project-detail-stat"><label>Progress</label><span>{selectedProject.progress}%</span></div>
+                <div className="project-detail-stat"><label>Budget</label><span>{projectDetail.spent} / {selectedProject.budget}</span></div>
+                <div className="project-detail-stat"><label>Income</label><span>{projectDetail.income || '—'}</span></div>
+                <div className="project-detail-stat"><label>Utilization</label><span>{projectDetail.utilization}</span></div>
+                <div className="project-detail-stat"><label>Due Date</label><span>{projectDetail.dueDate}</span></div>
+                <div className="project-detail-stat"><label>Location</label><span>{[projectDetail.town, projectDetail.woreda, projectDetail.region].filter(Boolean).join(', ') || '—'}</span></div>
+                <div className="project-detail-stat"><label>Site Type</label><span>{projectDetail.locationType?.replace('_', ' ') || '—'}</span></div>
+              </div>
+              {(projectDetail.assumptions || projectDetail.risks || projectDetail.indicators || projectDetail.outcomes) && (
+                <div className="project-planning-grid">
+                  {projectDetail.assumptions && <div className="planning-card"><h4>Assumptions</h4><p>{projectDetail.assumptions}</p></div>}
+                  {projectDetail.risks && <div className="planning-card"><h4>Risks</h4><p>{projectDetail.risks}</p></div>}
+                  {projectDetail.indicators && <div className="planning-card"><h4>Indicators</h4><p>{projectDetail.indicators}</p></div>}
+                  {projectDetail.outcomes && <div className="planning-card"><h4>Outcomes</h4><p>{projectDetail.outcomes}</p></div>}
+                  {projectDetail.mitigationStrategies && <div className="planning-card full"><h4>Mitigation Strategies</h4><p>{projectDetail.mitigationStrategies}</p></div>}
+                </div>
+              )}
+              {projectDetail.members?.length > 0 && (
+                <div className="project-team-section">
+                  <div className="project-detail-section-title">Team Members</div>
+                  <div className="team-chips">
+                    {projectDetail.members.map((m) => (
+                      <span key={m.id} className="team-chip">{m.name} <small>({m.staffRole || m.role})</small></span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === 'tasks' && (
@@ -919,7 +1122,10 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
                 onDragOver={(e, key) => { e.preventDefault(); setDropTarget(key); }}
                 onDragLeave={() => setDropTarget(null)}
                 onDrop={(e, key) => { e.preventDefault(); handleTaskDrop(key); }}
-                onTaskClick={openTaskModal}
+                onTaskClick={(task) => {
+                  const full = projectDetail?.tasks?.find((t) => t.id === task.id);
+                  setSelectedTask(full || { ...task, title: task.title });
+                }}
               />
             </>
           )}
@@ -1011,7 +1217,9 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Budget</h1></div>
-            <button className="btn-primary" onClick={async () => { const data = await loadLookup(); setExpenseForm({ ...EMPTY_EXPENSE, projectId: data.projects[0]?.id || '' }); setModal('expense'); }}>+ Add Expense</button>
+            {(isManager || user?.staffRole === 'finance_team') && (
+              <button className="btn-primary" onClick={async () => { const data = await loadLookup(); setExpenseForm({ ...EMPTY_EXPENSE, projectId: data.projects[0]?.id || '' }); setModal('expense'); }}>+ Add Expense</button>
+            )}
           </div>
           <div className="budget-overview-grid">
             <div className="budget-big-card"><div className="budget-big-label">Total Budget</div><div className="budget-big-val">{budget.summary.totalBudget}</div><div className="budget-big-sub">Across {budget.summary.projectCount} active projects</div></div>
@@ -1133,21 +1341,47 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
       )}
 
       {/* ── MESSAGES ── */}
-      {currentPage === 'messages' && messages && (
+      {currentPage === 'messages' && (
         <>
-          <div style={{ marginBottom: '16px' }}><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Messages</h1></div>
+          <div style={{ marginBottom: '16px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Task Messages</h1>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Select a project and task to discuss with your team.</p>
+          </div>
+          <div className="msg-selectors">
+            <div className="form-field">
+              <label>Project</label>
+              <select value={msgProjectId} onChange={(e) => handleMsgProjectChange(e.target.value)}>
+                <option value="">Select project...</option>
+                {lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Task</label>
+              <select
+                value={msgTaskId}
+                onChange={(e) => {
+                  setMsgTaskId(e.target.value);
+                  if (msgProjectId && e.target.value) loadTaskMessages(msgProjectId, e.target.value);
+                }}
+                disabled={!msgProjectId}
+              >
+                <option value="">Select task...</option>
+                {msgTasks.map((t) => <option key={t.id} value={t.id}>{t.title || t.name}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="messages-panel">
             <div className="messages-list">
-              {messages.messages?.length ? messages.messages.map((msg) => (
+              {messages?.messages?.length ? messages.messages.map((msg) => (
                 <div key={msg.id} className="message-bubble">
                   <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>
                   <div><div style={{ fontSize: '12px', fontWeight: '600' }}>{msg.senderName} <span style={{ fontWeight: 400, color: 'var(--gray-400)', fontSize: '10px' }}>{msg.time}</span></div><div style={{ fontSize: '13px', marginTop: '2px' }}>{msg.content}</div></div>
                 </div>
-              )) : <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>No messages yet. Send the first one!</p>}
+              )) : <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>{msgProjectId && msgTaskId ? 'No messages yet. Start the discussion!' : 'Select a project and task above to view messages.'}</p>}
             </div>
             <form className="message-compose" onSubmit={handleSendMessage}>
-              <input type="text" placeholder="Type a message to the team..." value={messageInput} onChange={(e) => setMessageInput(e.target.value)} />
-              <button className="btn-primary" type="submit" disabled={submitting}>Send</button>
+              <input type="text" placeholder="Write a message about this task..." value={messageInput} onChange={(e) => setMessageInput(e.target.value)} disabled={!msgProjectId || !msgTaskId} />
+              <button className="btn-primary" type="submit" disabled={submitting || !msgProjectId || !msgTaskId}>Send</button>
             </form>
           </div>
         </>
@@ -1167,44 +1401,83 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
                 </div>
               ))}
               <div className="form-field"><label>Description</label><textarea value={orgForm.description || ''} onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })} /></div>
-              <button className="btn-primary" style={{ fontSize: '11px' }} onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
+              <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
             </div>
             <div className="settings-card">
-              <div className="settings-card-title">Manage Users & Roles</div>
-              <div className="settings-users-table">
-                <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
-                {users.map((u) => (
-                  <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
-                    <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
-                  </div>
-                ))}
+              <div className="settings-card-title">Date & Time Configuration</div>
+              <div className="form-field">
+                <label>Date Format</label>
+                <select value={orgForm.dateFormat} onChange={(e) => setOrgForm({ ...orgForm, dateFormat: e.target.value })}>
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
               </div>
+              <div className="form-field">
+                <label>Timezone</label>
+                <select value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })}>
+                  <option value="Africa/Addis_Ababa">Africa/Addis Ababa (EAT)</option>
+                  <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
+                  <option value="UTC">UTC</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Fiscal Year Start</label>
+                <select value={orgForm.fiscalYearStart} onChange={(e) => setOrgForm({ ...orgForm, fiscalYearStart: e.target.value })}>
+                  {['January', 'April', 'July', 'October'].map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Date Settings'}</button>
             </div>
+            {canManageUsers(user) && (
+              <div className="settings-card">
+                <div className="settings-card-title">Add Staff Member</div>
+                <form onSubmit={handleAddStaff}>
+                  <div className="form-row">
+                    <div className="form-field"><label>Name *</label><input required value={newStaffForm.name} onChange={(e) => setNewStaffForm({ ...newStaffForm, name: e.target.value })} /></div>
+                    <div className="form-field"><label>Email *</label><input required type="email" value={newStaffForm.email} onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })} /></div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-field"><label>Password *</label><input required type="password" value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} /></div>
+                    <div className="form-field">
+                      <label>Staff Role *</label>
+                      <select value={newStaffForm.staffRole} onChange={(e) => setNewStaffForm({ ...newStaffForm, staffRole: e.target.value })}>
+                        {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <button className="btn-primary" type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Staff'}</button>
+                </form>
+              </div>
+            )}
+            {canManageUsers(user) && (
+              <div className="settings-card">
+                <div className="settings-card-title">Manage Users & Roles</div>
+                <div className="settings-users-table">
+                  <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
+                  {users.map((u) => (
+                    <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
+                      <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
 
       {/* ── MODALS ── */}
-      <Modal open={modal === 'project'} title={projectForm.id ? 'Edit Project' : 'New Project'} onClose={closeModal}>
-        <form onSubmit={handleSaveProject}>
-          <div className="form-field"><label>Name *</label><input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} /></div>
-          <div className="form-field"><label>Description</label><textarea value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} /></div>
-          <div className="form-row">
-            <div className="form-field"><label>Status</label><select value={projectForm.status} onChange={(e) => setProjectForm({ ...projectForm, status: e.target.value })}><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
-            <div className="form-field"><label>Icon Color</label><select value={projectForm.icon} onChange={(e) => setProjectForm({ ...projectForm, icon: e.target.value })}><option value="green">Green</option><option value="blue">Blue</option><option value="amber">Amber</option><option value="red">Red</option></select></div>
-          </div>
-          <div className="form-row">
-            <div className="form-field"><label>Budget ($)</label><input type="number" value={projectForm.budget} onChange={(e) => setProjectForm({ ...projectForm, budget: e.target.value })} /></div>
-            <div className="form-field"><label>Donor</label><input value={projectForm.donor} onChange={(e) => setProjectForm({ ...projectForm, donor: e.target.value })} /></div>
-          </div>
-          <div className="form-row">
-            <div className="form-field"><label>Start Date</label><input type="date" value={projectForm.startDate} onChange={(e) => setProjectForm({ ...projectForm, startDate: e.target.value })} /></div>
-            <div className="form-field"><label>End Date</label><input type="date" value={projectForm.endDate} onChange={(e) => setProjectForm({ ...projectForm, endDate: e.target.value })} /></div>
-          </div>
-          <div className="form-field"><label>Manager *</label><select required value={projectForm.managerId} onChange={(e) => setProjectForm({ ...projectForm, managerId: e.target.value })}>{lookup.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
-          <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Save Project'}</button></div>
-        </form>
-      </Modal>
+      <ProjectFormModal
+        open={modal === 'project'}
+        form={projectForm}
+        setForm={setProjectForm}
+        users={lookup.users}
+        onSubmit={handleSaveProject}
+        onClose={closeModal}
+        submitting={submitting}
+        isManager={isManager}
+      />
 
       <Modal open={modal === 'task'} title={taskForm.id ? 'Edit Task' : 'New Task'} onClose={closeModal}>
         <form onSubmit={handleSaveTask}>
@@ -1365,7 +1638,24 @@ const DashboardPages = ({ currentPage, onNavigate, globalSearch }) => {
         {editUser && (
           <form onSubmit={handleSaveUser}>
             <div className="form-field"><label>Name</label><input value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} /></div>
-            <div className="form-field"><label>Role</label><select value={editUser.role} onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}><option value="admin">Admin</option><option value="manager">Manager</option><option value="staff">Staff</option><option value="donor">Donor</option></select></div>
+            <div className="form-field">
+              <label>Role</label>
+              <select value={editUser.role} onChange={(e) => setEditUser({ ...editUser, role: e.target.value })} disabled={!canManageUsers(user)}>
+                <option value="admin">Administrator</option>
+                <option value="project_manager">Project Manager</option>
+                <option value="manager">Project Manager</option>
+                <option value="staff">Staff</option>
+                <option value="donor">Donor</option>
+              </select>
+            </div>
+            {editUser.role === 'staff' && canManageUsers(user) && (
+              <div className="form-field">
+                <label>Staff Type</label>
+                <select value={editUser.staffRole || 'program_staff'} onChange={(e) => setEditUser({ ...editUser, staffRole: e.target.value })}>
+                  {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+            )}
             <div className="form-field"><label><input type="checkbox" checked={editUser.isActive} onChange={(e) => setEditUser({ ...editUser, isActive: e.target.checked })} /> Active</label></div>
             <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Save</button></div>
           </form>

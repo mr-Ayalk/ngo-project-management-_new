@@ -11,7 +11,10 @@ export async function GET(req) {
     const payload = await verifyJWT(token);
     if (!payload) return Response.json({ error: 'Invalid token' }, { status: 401 });
 
-    const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, email: true, name: true, role: true, avatar: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { id: true, email: true, name: true, role: true, staffRole: true, avatar: true },
+    });
     if (!user) return Response.json({ error: 'User not found' }, { status: 404 });
 
     return Response.json({ user });

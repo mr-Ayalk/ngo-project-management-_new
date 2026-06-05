@@ -25,6 +25,9 @@ export async function PUT(req) {
     if (body.country !== undefined) data.country = body.country;
     if (body.location !== undefined) data.location = body.location;
     if (body.description !== undefined) data.description = body.description;
+    if (body.dateFormat !== undefined) data.dateFormat = body.dateFormat;
+    if (body.timezone !== undefined) data.timezone = body.timezone;
+    if (body.fiscalYearStart !== undefined) data.fiscalYearStart = body.fiscalYearStart;
 
     let org;
     if (existing) {

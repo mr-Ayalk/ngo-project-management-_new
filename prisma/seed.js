@@ -32,6 +32,9 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.payment.deleteMany();
+  await prisma.taskComment.deleteMany();
+  await prisma.pinnedProject.deleteMany();
+  await prisma.projectMember.deleteMany();
   await prisma.message.deleteMany();
   await prisma.activity.deleteMany();
   await prisma.calendarEvent.deleteMany();
@@ -82,6 +85,7 @@ async function main() {
         name: 'James Kipchoge',
         password,
         role: 'staff',
+        staffRole: 'field_worker',
         joinedDate: new Date('2023-08-10'),
       },
     }),
@@ -91,6 +95,7 @@ async function main() {
         name: 'Ruth Mwangi',
         password,
         role: 'staff',
+        staffRole: 'finance_team',
         joinedDate: new Date('2023-09-15'),
       },
     }),
@@ -123,23 +128,47 @@ async function main() {
       beneficiariesThisMonth: 125,
       activePrograms: 12,
       completionRate: 86,
+      dateFormat: 'DD/MM/YYYY',
+      timezone: 'Africa/Addis_Ababa',
+      fiscalYearStart: 'July',
     },
   });
 
   const projects = await Promise.all([
     prisma.project.create({
       data: {
-        name: 'Community Health Project',
-        description: 'Delivering essential health services to underserved communities across the region.',
+        name: 'Kubernetes Migration',
+        description: 'Run container vulnerability scans and review IAM roles.',
         status: 'on-track',
         icon: 'green',
-        startDate: new Date('2024-01-15'),
-        endDate: new Date('2024-05-15'),
-        budget: 12000,
-        spent: 8500,
-        progress: 72,
+        startDate: new Date('2025-10-15'),
+        endDate: new Date('2025-12-10'),
+        budget: 1000000,
+        spent: 0,
+        progress: 0,
+        income: 500000,
         donor: 'Global Health Fund',
+        donorName: 'Global Health Fund',
+        assumptions: 'Stable donor funding, community participation, trained field staff available.',
+        risks: 'Seasonal access challenges, supply chain delays, staff turnover.',
+        indicators: 'Number of sites assessed, vulnerability scan completion rate, IAM roles reviewed.',
+        outcomes: 'Improved security posture, reduced vulnerability exposure, compliant IAM policies.',
+        mitigationStrategies: 'Risk: Supply delays → Mitigation: Pre-position materials. Outcome: On-time delivery.',
+        locationType: 'school',
+        region: 'Addis Ababa',
+        zone: 'East Shewa',
+        town: 'Adama',
+        woreda: 'Bole',
+        kebele: 'Kebele 03',
+        woredaBudget: 3500000,
         managerId: jane.id,
+        leadId: grace.id,
+        members: {
+          create: [
+            { userId: james.id, role: 'member' },
+            { userId: ruth.id, role: 'member' },
+          ],
+        },
       },
     }),
     prisma.project.create({
@@ -241,6 +270,26 @@ async function main() {
       },
     });
   }
+
+  const securityTask = await prisma.task.create({
+    data: {
+      title: 'Security Audit',
+      description: 'Run container vulnerability scans and review IAM roles.',
+      status: 'todo',
+      priority: 'medium',
+      dueDate: new Date('2025-12-10'),
+      projectId: health.id,
+      assigneeId: james.id,
+    },
+  });
+
+  await prisma.pinnedProject.create({
+    data: { userId: admin.id, projectId: health.id, sortOrder: 0 },
+  });
+
+  await prisma.pinnedProject.create({
+    data: { userId: jane.id, projectId: health.id, sortOrder: 0 },
+  });
 
   const budgetCategories = [
     { projectId: health.id, category: 'personnel', allocated: 6000, spent: 4500 },

@@ -1,29 +1,23 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody } from '@/lib/api-utils';
-
-const ROLE_LABELS = {
-  admin: 'Admin',
-  manager: 'Program Mgr',
-  staff: 'Staff',
-  donor: 'Donor',
-};
+import { hashPassword } from '@/lib/auth';
+import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
+import { ROLE_LABELS, isProjectManager, formatUserRole } from '@/lib/roles';
 
 export async function GET() {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, isActive: true, joinedDate: true },
+      select: {
+        id: true, name: true, email: true, role: true, staffRole: true,
+        isActive: true, joinedDate: true,
+      },
       orderBy: { joinedDate: 'asc' },
     });
 
     return json(
       users.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        roleLabel: ROLE_LABELS[u.role] || u.role,
+        ...formatUserRole(u),
         status: u.isActive ? 'Active' : 'Inactive',
         isActive: u.isActive,
         joinedDate: u.joinedDate,
@@ -34,25 +28,71 @@ export async function GET() {
   }
 }
 
+export async function POST(req) {
+  try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
+    const caller = await prisma.user.findUnique({ where: { id: auth.user.id } });
+    if (!isProjectManager(caller)) return error('Only project managers can add staff', 403);
+
+    const body = await parseBody(req);
+    if (!body?.email || !body?.name || !body?.password) {
+      return error('Email, name, and password are required');
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existing) return error('Email already registered', 409);
+
+    const hashedPassword = await hashPassword(body.password);
+    const user = await prisma.user.create({
+      data: {
+        email: body.email,
+        name: body.name,
+        password: hashedPassword,
+        role: body.role || 'staff',
+        staffRole: body.staffRole || 'program_staff',
+      },
+      select: { id: true, name: true, email: true, role: true, staffRole: true, isActive: true },
+    });
+
+    return json({
+      ...formatUserRole(user),
+      status: 'Active',
+    }, 201);
+  } catch (err) {
+    console.error('Users POST error:', err);
+    return error('Failed to create user', 500);
+  }
+}
+
 export async function PUT(req) {
   try {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+
     const body = await parseBody(req);
     if (!body?.id) return error('User id is required');
 
+    const caller = await prisma.user.findUnique({ where: { id: auth.user.id } });
+    if (!isProjectManager(caller) && body.id !== auth.user.id) {
+      return error('Forbidden', 403);
+    }
+
     const data = {};
     if (body.name) data.name = body.name;
-    if (body.role) data.role = body.role;
-    if (body.isActive !== undefined) data.isActive = body.isActive;
+    if (body.role && isProjectManager(caller)) data.role = body.role;
+    if (body.staffRole !== undefined && isProjectManager(caller)) data.staffRole = body.staffRole;
+    if (body.isActive !== undefined && isProjectManager(caller)) data.isActive = body.isActive;
 
     const user = await prisma.user.update({
       where: { id: body.id },
       data,
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, role: true, staffRole: true, isActive: true },
     });
 
     return json({
-      ...user,
-      roleLabel: ROLE_LABELS[user.role] || user.role,
+      ...formatUserRole(user),
       status: user.isActive ? 'Active' : 'Inactive',
     });
   } catch (err) {
