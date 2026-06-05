@@ -24,12 +24,12 @@ export default function Landing() {
     >
       {/* Nav */}
       <header className="fixed top-0 left-0 right-0 z-30 bg-white shadow-sm border-b border-slate-100">
-        <div className="max-w-[1400px] mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-6 h-24 flex items-center justify-between">
           <div className="flex items-center">
             <img
               src="/engage.jpg"
               alt="ENA"
-              className="h-12 w-auto object-contain cursor-pointer"
+              className="h-20 md:h-24 w-auto object-contain cursor-pointer"
               onClick={() => scrollTo("hero")}
             />
           </div>
@@ -149,8 +149,8 @@ export default function Landing() {
           <div className="max-w-[1400px] mx-auto px-6 w-full">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               <div className="lg:col-span-7">
-                <h1 className="text-6xl md:text-7xl leading-tight font-extrabold text-slate-900">
-                  Empowering Communities. Creating Lasting Change.
+                <h1 className="text-5xl md:text-6xl leading-tight font-extrabold text-slate-900">
+                  Empowering Communities.<br />Creating Lasting Change.
                 </h1>
                 <p className="mt-6 text-xl md:text-2xl text-slate-700 max-w-2xl leading-relaxed">
                   Sustainable development, education, healthcare, clean water,
