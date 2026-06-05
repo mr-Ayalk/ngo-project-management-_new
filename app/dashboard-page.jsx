@@ -26,7 +26,7 @@ export default function DashboardPage() {
             {
               label: 'Planned',
               data: [20, 40, 55, 70, 90],
-              borderColor: '#d1d5db',
+              borderColor: '#d1d5dbd7',
               borderDash: [5, 4],
               borderWidth: 1.5,
               pointRadius: 0,
