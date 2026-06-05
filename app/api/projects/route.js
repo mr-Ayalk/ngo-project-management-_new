@@ -14,13 +14,34 @@ function formatProject(p) {
     budget: formatCurrency(p.budget),
     budgetRaw: p.budget,
     spent: p.spent,
+    income: p.income,
     date: formatDate(p.startDate),
     startDate: p.startDate,
     endDate: p.endDate,
     dueDate: formatDate(p.endDate),
     donor: p.donor,
+    donorName: p.donorName,
+    assumptions: p.assumptions,
+    risks: p.risks,
+    indicators: p.indicators,
+    outcomes: p.outcomes,
     location: p.location,
+    locationType: p.locationType,
+    region: p.region,
+    zone: p.zone,
+    town: p.town,
+    kebele: p.kebele,
+    woreda: p.woreda,
+    woredaBudget: p.woredaBudget,
+    mitigationStrategies: p.mitigationStrategies,
     manager: p.manager ? { id: p.manager.id, name: p.manager.name } : null,
+    lead: p.lead ? { id: p.lead.id, name: p.lead.name } : null,
+    members: p.members?.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      role: m.role,
+      staffRole: m.user.staffRole,
+    })) || [],
   };
 }
 
@@ -36,7 +57,11 @@ export async function GET(req) {
 
     const projects = await prisma.project.findMany({
       where,
-      include: { manager: { select: { id: true, name: true } } },
+      include: {
+        manager: { select: { id: true, name: true } },
+        lead: { select: { id: true, name: true } },
+        members: { include: { user: { select: { id: true, name: true, staffRole: true } } } },
+      },
       orderBy: { startDate: 'desc' },
     });
 
@@ -63,11 +88,36 @@ export async function POST(req) {
         budget: body.budget || 0,
         spent: body.spent || 0,
         progress: body.progress || 0,
+        income: body.income || 0,
         location: body.location,
-        donor: body.donor,
+        donor: body.donor || body.donorName,
+        donorName: body.donorName || body.donor,
+        assumptions: body.assumptions,
+        risks: body.risks,
+        indicators: body.indicators,
+        outcomes: body.outcomes,
+        locationType: body.locationType,
+        region: body.region,
+        zone: body.zone,
+        town: body.town,
+        kebele: body.kebele,
+        woreda: body.woreda,
+        woredaBudget: body.woredaBudget,
+        mitigationStrategies: body.mitigationStrategies,
         managerId: body.managerId,
+        leadId: body.leadId || body.managerId,
+        members: body.memberIds?.length ? {
+          create: body.memberIds.map((userId) => ({
+            userId,
+            role: body.leadId === userId ? 'lead' : 'member',
+          })),
+        } : undefined,
       },
-      include: { manager: { select: { id: true, name: true } } },
+      include: {
+        manager: { select: { id: true, name: true } },
+        lead: { select: { id: true, name: true } },
+        members: { include: { user: { select: { id: true, name: true, staffRole: true } } } },
+      },
     });
 
     return json(formatProject(project), 201);

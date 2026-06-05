@@ -21,7 +21,10 @@ export async function POST(req) {
     // update lastLogin
     await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
 
-    return Response.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    return Response.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, staffRole: user.staffRole },
+    });
   } catch (err) {
     console.error('Login error', err);
     return Response.json({ error: 'Internal server error' }, { status: 500 });

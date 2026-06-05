@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/Sidebar';
-import { Topbar } from '@/components/Topbar';
+import  Sidebar  from '@/components/Sidebar';
+import  Topbar from '@/components/Topbar';
 import './dashboard.css';
 
 export default function DashboardLayout({ children }) {
