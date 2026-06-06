@@ -39,8 +39,14 @@ export function AuthProvider({ children }) {
       throw new Error('Login failed — no token received');
     }
     localStorage.setItem('token', data.token.trim());
-    setUser(data.user);
-    return data.user;
+    try {
+      const me = await api.me();
+      setUser(me.user);
+      return me.user;
+    } catch {
+      setUser(data.user);
+      return data.user;
+    }
   };
 
   const logout = () => {

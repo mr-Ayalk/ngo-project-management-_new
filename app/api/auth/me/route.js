@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
 import { json, error, requireAuth } from '@/lib/api-utils';
+import { PUBLIC_USER_SELECT } from '@/lib/user-public';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export async function GET(req) {
 
     const user = await prisma.user.findUnique({
       where: { id: auth.user.id },
-      select: { id: true, email: true, name: true, role: true, staffRole: true, avatar: true },
+      select: PUBLIC_USER_SELECT,
     });
     if (!user) return error('User not found', 404);
 

@@ -154,7 +154,7 @@ export default function ProfileSettings() {
               >
                 {uploadingPhoto ? 'Uploading…' : 'Upload Photo'}
               </button>
-              <span className="profile-upload-hint">JPG, PNG, WebP up to 4MB</span>
+              <span className="profile-upload-hint">Saved to your account · JPG, PNG, WebP up to 4MB</span>
             </div>
           </div>
         </div>

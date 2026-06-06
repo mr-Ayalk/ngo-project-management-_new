@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/auth';
+import { isValidAvatarValue } from '@/lib/avatar-upload';
+import { PUBLIC_USER_SELECT } from '@/lib/user-public';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
 import { logAudit, getClientIp } from '@/lib/audit';
 
@@ -12,15 +14,7 @@ export async function GET(req) {
 
     const user = await prisma.user.findUnique({
       where: { id: auth.user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        staffRole: true,
-        avatar: true,
-        joinedDate: true,
-      },
+      select: { ...PUBLIC_USER_SELECT, joinedDate: true },
     });
 
     if (!user) return error('User not found', 404);
@@ -49,7 +43,7 @@ export async function PUT(req) {
 
     if (body.avatar !== undefined) {
       const avatar = String(body.avatar).trim();
-      if (avatar.startsWith('emoji:') || avatar.startsWith('http')) {
+      if (isValidAvatarValue(avatar)) {
         data.avatar = avatar;
       } else if (avatar === '') {
         data.avatar = null;
@@ -75,14 +69,7 @@ export async function PUT(req) {
     const user = await prisma.user.update({
       where: { id: auth.user.id },
       data,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        staffRole: true,
-        avatar: true,
-      },
+      select: PUBLIC_USER_SELECT,
     });
 
     await logAudit({

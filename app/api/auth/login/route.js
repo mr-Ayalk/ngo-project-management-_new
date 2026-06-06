@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { verifyPassword, signJWT } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { toPublicUser } from '@/lib/user-public';
 
 export async function POST(req) {
   try {
@@ -27,7 +28,7 @@ export async function POST(req) {
 
     return Response.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, staffRole: user.staffRole },
+      user: toPublicUser(user),
     });
   } catch (err) {
     console.error('Login error', err);
