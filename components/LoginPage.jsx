@@ -22,7 +22,7 @@ export default function LoginPage() {
 
     try {
       await login(email.trim(), password);
-      router.push('/');
+      router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Unable to sign in. Please try again.');
     } finally {

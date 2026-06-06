@@ -2,6 +2,7 @@
 
 import Modal from '@/components/Modal';
 import AutocompleteInput from '@/components/AutocompleteInput';
+import LocationMap from '@/components/LocationMap';
 import {
   REGIONS, ZONES, TOWNS, KEBELES, WOREDAS, WOREDA_BUDGETS,
   LOCATION_TYPES, formatBudgetInput, parseBudgetInput,
@@ -150,6 +151,7 @@ export default function ProjectFormModal({
               />
             </div>
           </div>
+          <LocationMap region={form.region} zone={form.zone} town={form.town} woreda={form.woreda} />
         </div>
 
         <div className="project-form-section">

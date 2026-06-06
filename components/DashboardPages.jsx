@@ -10,9 +10,11 @@ import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
 import { isProjectManager, canManageUsers, STAFF_ROLES } from '@/lib/roles';
 import { formatBudgetInput } from '@/lib/ethiopia-locations';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { BENEFICIARY_STATUSES } from '@/lib/beneficiary-status';
 
 function Loading() {
-  return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>Loading...</div>;
+  return <div className="page-loading"><div className="login-spinner" /><span>Loading…</span></div>;
 }
 
 function ErrorMsg({ message }) {
@@ -93,6 +95,7 @@ const DashboardPages = ({
   const chartInstance = useRef(null);
 
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null);
@@ -124,7 +127,13 @@ const DashboardPages = ({
   const [projectFilter, setProjectFilter] = useState('all');
   const [projectSearch, setProjectSearch] = useState('');
   const [beneRegion, setBeneRegion] = useState('all');
+  const [beneProgram, setBeneProgram] = useState('all');
+  const [beneStatus, setBeneStatus] = useState('all');
   const [beneSearch, setBeneSearch] = useState('');
+  const debouncedProjectSearch = useDebouncedValue(projectSearch, 350);
+  const debouncedBeneSearch = useDebouncedValue(beneSearch, 350);
+  const messagesEndRef = useRef(null);
+  const pageDataLoaded = useRef({});
   const [docCategory, setDocCategory] = useState('all');
   const [orgForm, setOrgForm] = useState({
     name: '', country: '', email: '', phone: '', location: '', description: '',
@@ -186,8 +195,11 @@ const DashboardPages = ({
     }
   }, []);
 
-  const loadPageData = useCallback(async () => {
-    setLoading(true);
+  const loadPageData = useCallback(async (fullLoader = false) => {
+    const cacheKey = `${currentPage}-${projectFilter}-${debouncedProjectSearch}-${beneRegion}-${beneProgram}-${beneStatus}-${debouncedBeneSearch}-${docCategory}-${calYear}-${calMonth}`;
+    const hasCache = pageDataLoaded.current[cacheKey];
+    if (fullLoader || !hasCache) setLoading(true);
+    else setRefreshing(true);
     setError(null);
     try {
       switch (currentPage) {
@@ -197,7 +209,7 @@ const DashboardPages = ({
         case 'projects': {
           const params = {};
           if (projectFilter !== 'all') params.status = projectFilter;
-          if (projectSearch) params.search = projectSearch;
+          if (debouncedProjectSearch) params.search = debouncedProjectSearch;
           setProjects(await api.projects(params));
           break;
         }
@@ -213,7 +225,9 @@ const DashboardPages = ({
         case 'beneficiaries': {
           const params = {};
           if (beneRegion !== 'all') params.region = beneRegion;
-          if (beneSearch) params.search = beneSearch;
+          if (beneProgram !== 'all') params.program = beneProgram;
+          if (beneStatus !== 'all') params.status = beneStatus;
+          if (debouncedBeneSearch) params.search = debouncedBeneSearch;
           setBeneficiaries(await api.beneficiaries(params));
           break;
         }
@@ -228,7 +242,6 @@ const DashboardPages = ({
           setPartners(await api.partners());
           break;
         case 'messages':
-          setMessages(await api.messages());
           break;
         case 'settings': {
           const [org, userList] = await Promise.all([api.organization(), api.users()]);
@@ -259,12 +272,21 @@ const DashboardPages = ({
         default:
           break;
       }
+      pageDataLoaded.current[cacheKey] = true;
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [currentPage, projectFilter, projectSearch, beneRegion, beneSearch, docCategory, calYear, calMonth]);
+  }, [currentPage, projectFilter, debouncedProjectSearch, beneRegion, beneProgram, beneStatus, debouncedBeneSearch, docCategory, calYear, calMonth, user?.role]);
+
+  const prevPageRef = useRef(currentPage);
+  useEffect(() => {
+    const fullLoader = prevPageRef.current !== currentPage;
+    prevPageRef.current = currentPage;
+    loadPageData(fullLoader);
+  }, [currentPage, projectFilter, debouncedProjectSearch, beneRegion, beneProgram, beneStatus, debouncedBeneSearch, docCategory, calYear, calMonth]);
 
   const loadProjectTasks = useCallback(async (projectId) => {
     if (!projectId) return;
@@ -290,7 +312,6 @@ const DashboardPages = ({
     setActiveTab('overview');
   };
 
-  useEffect(() => { loadPageData(); }, [loadPageData]);
   useEffect(() => { loadLookup(); }, [loadLookup]);
 
   useEffect(() => {
@@ -324,6 +345,18 @@ const DashboardPages = ({
     if (!pendingNav?.projectId) return;
     const openPending = async () => {
       try {
+        if (pendingNav.openMessages) {
+          onNavigate?.('messages');
+          setMsgProjectId(pendingNav.projectId);
+          const detail = await api.project(pendingNav.projectId);
+          setMsgTasks(detail.tasks || []);
+          if (pendingNav.taskId) {
+            setMsgTaskId(pendingNav.taskId);
+            setMessages(await api.messages({ projectId: pendingNav.projectId, taskId: pendingNav.taskId }));
+          }
+          onPendingNavHandled?.();
+          return;
+        }
         const proj = await api.project(pendingNav.projectId);
         setSelectedProject({ id: proj.id, name: proj.name, status: proj.status, icon: proj.icon, progress: proj.progress, budget: proj.budget });
         setProjectView('detail');
@@ -338,7 +371,7 @@ const DashboardPages = ({
       }
     };
     openPending();
-  }, [pendingNav, onPendingNavHandled]);
+  }, [pendingNav, onPendingNavHandled, onNavigate]);
 
   useEffect(() => {
     if (selectedProject?.id) {
@@ -851,6 +884,62 @@ const DashboardPages = ({
     }
   };
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages?.messages]);
+
+  useEffect(() => {
+    if (currentPage !== 'messages' || !msgProjectId || !msgTaskId) return undefined;
+    loadTaskMessages(msgProjectId, msgTaskId);
+    const interval = setInterval(() => loadTaskMessages(msgProjectId, msgTaskId), 10000);
+    return () => clearInterval(interval);
+  }, [currentPage, msgProjectId, msgTaskId, loadTaskMessages]);
+
+  const handleDeleteMessage = async (msgId) => {
+    if (!confirm('Delete this message?')) return;
+    try {
+      await api.deleteMessage(msgId);
+      await loadTaskMessages(msgProjectId, msgTaskId);
+      showToast('Message deleted');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteDocument = async (docId) => {
+    if (!confirm('Delete this document permanently?')) return;
+    try {
+      await api.deleteDocument(docId);
+      showToast('Document deleted');
+      closeModal();
+      loadPageData(false);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    if (!confirm('Delete this report permanently?')) return;
+    try {
+      await api.deleteReport(reportId);
+      showToast('Report deleted');
+      closeModal();
+      loadPageData(false);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const openReportDetail = async (report) => {
+    try {
+      const full = await api.report(report.id);
+      setViewReport(full);
+    } catch {
+      setViewReport(report);
+    }
+    setModal('reportView');
+  };
+
   const openActivities = async () => {
     try {
       setActivities(await api.activities());
@@ -919,6 +1008,7 @@ const DashboardPages = ({
 
   return (
     <div className="content" onClick={() => setMenuOpen(null)}>
+      {refreshing && <div className="refresh-bar" aria-hidden="true" />}
       <Toast message={toast?.message} type={toast?.type} />
 
       {/* ── DASHBOARD ── */}
@@ -1298,10 +1388,21 @@ const DashboardPages = ({
           </div>
           <div className="reports-grid">
             {reports.map((report) => (
-              <div key={report.id} className="report-card" onClick={() => { setViewReport(report); setModal('reportView'); }}>
+              <div key={report.id} className="report-card" onClick={() => openReportDetail(report)}>
                 <div className="report-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
                 <div className="report-name">{report.name}</div>
                 <div className="report-date">{report.date}</div>
+                {report.description && (
+                  <p className="report-preview">{report.description.length > 120 ? `${report.description.slice(0, 120)}…` : report.description}</p>
+                )}
+                {isManager && (
+                  <button
+                    type="button"
+                    className="card-delete-btn"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
+                    aria-label="Delete report"
+                  >Delete</button>
+                )}
               </div>
             ))}
           </div>
@@ -1324,14 +1425,22 @@ const DashboardPages = ({
           <div className="filter-row" style={{ marginBottom: '12px' }}>
             <select className="filter-select" value={beneRegion} onChange={(e) => setBeneRegion(e.target.value)}>
               <option value="all">All Regions</option>
-              {beneficiaries.regions.map((r) => <option key={r} value={r}>{r}</option>)}
+              {(beneficiaries.regions || []).map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input className="search-inline" type="text" placeholder="Search beneficiaries..." value={beneSearch} onChange={(e) => { setBeneSearch(e.target.value); onTopbarSearchSync?.(e.target.value); }} onKeyDown={(e) => e.key === 'Enter' && loadPageData()} />
+            <select className="filter-select" value={beneProgram} onChange={(e) => setBeneProgram(e.target.value)}>
+              <option value="all">All Programs</option>
+              {(beneficiaries.programs || []).map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select className="filter-select" value={beneStatus} onChange={(e) => setBeneStatus(e.target.value)}>
+              <option value="all">All Statuses</option>
+              {BENEFICIARY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <input className="search-inline" type="text" placeholder="Search by name..." value={beneSearch} onChange={(e) => { setBeneSearch(e.target.value); onTopbarSearchSync?.(e.target.value); }} />
           </div>
           <div className="bene-table">
             <div className="bene-table-head"><span>Name</span><span>Program</span><span>Region</span><span>Status</span><span>Enrolled</span></div>
             {beneficiaries.beneficiaries.map((bene) => (
-              <div key={bene.id} className="bene-row"><span className="bene-name">{bene.name}</span><span className="bene-cell">{bene.program}</span><span className="bene-cell">{bene.region}</span><span><span className={`status-badge ${bene.status}`} style={{ fontSize: '10px' }}>{bene.statusLabel}</span></span><span className="bene-cell">{bene.date}</span></div>
+              <div key={bene.id} className="bene-row"><span className="bene-name">{bene.name}</span><span className="bene-cell">{bene.program}</span><span className="bene-cell">{bene.region}</span><span><span className={`status-badge status-${bene.statusBadge}`}>{bene.statusLabel}</span></span><span className="bene-cell">{bene.date}</span></div>
             ))}
           </div>
         </>
@@ -1358,6 +1467,9 @@ const DashboardPages = ({
                 <div className="doc-card-actions">
                   <button type="button" onClick={() => { setViewDocument(doc); setModal('documentView'); }}>View</button>
                   <button type="button" onClick={() => downloadDocument(doc)}>Download</button>
+                  {isManager && (
+                    <button type="button" className="danger-text" onClick={() => handleDeleteDocument(doc.id)}>Delete</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -1393,9 +1505,9 @@ const DashboardPages = ({
       {/* ── MESSAGES ── */}
       {currentPage === 'messages' && (
         <>
-          <div style={{ marginBottom: '16px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Task Messages</h1>
-            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Select a project and task to discuss with your team.</p>
+          <div className="page-header">
+            <h1>Team Discussions</h1>
+            <p>Select a project and task to collaborate with your team in real time.</p>
           </div>
           <div className="msg-selectors">
             <div className="form-field">
@@ -1420,24 +1532,29 @@ const DashboardPages = ({
               </select>
             </div>
           </div>
-          <div className="messages-panel">
-            <div className="messages-list">
+          <div className="messages-panel chat-panel">
+            <div className="messages-list chat-list">
               {messages?.messages?.length ? messages.messages.map((msg) => (
-                <div key={msg.id} className="message-bubble">
-                  <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>
+                <div key={msg.id} className={`message-bubble${msg.isOwn ? ' own' : ''}`}>
+                  {!msg.isOwn && <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>}
                   <div className="msg-body">
                     <div className="msg-sender">
-                      {msg.senderName}
+                      {msg.isOwn ? 'You' : msg.senderName}
                       <span className="msg-time">{msg.time}</span>
                     </div>
                     <div className="msg-content">{msg.content}</div>
+                    {(msg.isOwn || isManager) && (
+                      <button type="button" className="msg-delete-btn" onClick={() => handleDeleteMessage(msg.id)} aria-label="Delete message">Delete</button>
+                    )}
                   </div>
+                  {msg.isOwn && <div className="msg-avatar own" style={{ background: msg.color }}>{msg.initials}</div>}
                 </div>
               )) : <p className="messages-empty">{msgProjectId && msgTaskId ? 'No messages yet. Start the discussion!' : 'Select a project and task above to view messages.'}</p>}
+              <div ref={messagesEndRef} />
             </div>
-            <form className="message-compose" onSubmit={handleSendMessage}>
-              <input type="text" placeholder="Write a message about this task..." value={messageInput} onChange={(e) => setMessageInput(e.target.value)} disabled={!msgProjectId || !msgTaskId} />
-              <button className="btn-primary" type="submit" disabled={submitting || !msgProjectId || !msgTaskId}>Send</button>
+            <form className="message-compose chat-compose" onSubmit={handleSendMessage}>
+              <input type="text" placeholder="Type your message…" value={messageInput} onChange={(e) => setMessageInput(e.target.value)} disabled={!msgProjectId || !msgTaskId || submitting} />
+              <button className="btn-primary" type="submit" disabled={submitting || !msgProjectId || !msgTaskId || !messageInput.trim()}>Send</button>
             </form>
           </div>
         </>
@@ -1615,7 +1732,7 @@ const DashboardPages = ({
           </div>
           <div className="form-row">
             <div className="form-field"><label>Email</label><input type="email" value={beneficiaryForm.email} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, email: e.target.value })} /></div>
-            <div className="form-field"><label>Status</label><select value={beneficiaryForm.status} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, status: e.target.value })}><option value="active">Active</option><option value="follow-up">Follow-up</option></select></div>
+            <div className="form-field"><label>Status</label><select value={beneficiaryForm.status} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, status: e.target.value })}>{BENEFICIARY_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></div>
           </div>
           <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Add Beneficiary</button></div>
         </form>
@@ -1662,13 +1779,16 @@ const DashboardPages = ({
         </form>
       </Modal>
 
-      <Modal open={modal === 'documentView'} title={viewDocument?.name || 'Document'} onClose={closeModal}>
+      <Modal open={modal === 'documentView'} title={viewDocument?.name || 'Document'} onClose={closeModal} width={560}>
         {viewDocument && (<>
-          <p style={{ fontSize: '13px', color: 'var(--gray-600)' }}><strong>Project:</strong> {viewDocument.project || 'All Projects'}</p>
-          <p style={{ fontSize: '13px', color: 'var(--gray-600)' }}><strong>Category:</strong> {viewDocument.category}</p>
-          <p style={{ fontSize: '13px', color: 'var(--gray-600)' }}><strong>Type:</strong> {viewDocument.fileType}</p>
-          <p style={{ fontSize: '13px', color: 'var(--gray-600)' }}><strong>Uploaded:</strong> {viewDocument.uploaded}</p>
-          <div className="form-actions"><button className="btn-primary" onClick={() => downloadDocument(viewDocument)}>Download</button></div>
+          <p className="detail-meta"><strong>Project:</strong> {viewDocument.project || 'All Projects'}</p>
+          <p className="detail-meta"><strong>Category:</strong> {viewDocument.category}</p>
+          <p className="detail-meta"><strong>Type:</strong> {viewDocument.fileType}</p>
+          <p className="detail-meta"><strong>Uploaded:</strong> {viewDocument.uploaded}</p>
+          <div className="form-actions">
+            <button className="btn-primary" type="button" onClick={() => downloadDocument(viewDocument)}>Download</button>
+            {isManager && <button className="btn-danger" type="button" onClick={() => handleDeleteDocument(viewDocument.id)}>Delete</button>}
+          </div>
         </>)}
       </Modal>
 
@@ -1691,7 +1811,7 @@ const DashboardPages = ({
       <Modal open={modal === 'report'} title="New Report" onClose={closeModal}>
         <form onSubmit={handleSaveReport}>
           <div className="form-field"><label>Name *</label><input required value={reportForm.name} onChange={(e) => setReportForm({ ...reportForm, name: e.target.value })} /></div>
-          <div className="form-field"><label>Description</label><textarea value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} /></div>
+          <div className="form-field"><label>Description</label><textarea rows={8} value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} placeholder="Write a detailed report summary, findings, recommendations…" /></div>
           <div className="form-field"><label>Date</label><input type="date" value={reportForm.reportDate} onChange={(e) => setReportForm({ ...reportForm, reportDate: e.target.value })} /></div>
           <div className="form-field">
             <label>Attach File (optional)</label>
@@ -1728,18 +1848,24 @@ const DashboardPages = ({
         </form>
       </Modal>
 
-      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal}>
+      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal} width={680}>
         {viewReport && (<>
-          <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>{viewReport.date}</p>
-          <p style={{ fontSize: '13px', color: 'var(--gray-700)' }}>{viewReport.description || 'No description provided.'}</p>
+          <p className="detail-meta report-detail-date">{viewReport.date}</p>
+          <div className="report-detail-body">
+            <h4 className="report-detail-heading">Report Description</h4>
+            <div className="report-detail-content">
+              {viewReport.description || 'No description provided.'}
+            </div>
+          </div>
           {viewReport.fileName && (
-            <p style={{ fontSize: '13px', marginTop: '12px', color: 'var(--gray-600)' }}>
-              Attached: {viewReport.fileName} {viewReport.fileSize ? `(${viewReport.fileSize})` : ''}
+            <p className="detail-meta report-attachment">
+              <strong>Attachment:</strong> {viewReport.fileName} {viewReport.fileSize ? `(${viewReport.fileSize})` : ''}
             </p>
           )}
           <div className="report-actions">
-            <button onClick={() => downloadReport(viewReport)}>Download{viewReport.fileUrl ? ' File' : ''}</button>
-            <button onClick={() => shareReport(viewReport)}>Share</button>
+            <button type="button" onClick={() => downloadReport(viewReport)}>Download{viewReport.fileUrl ? ' File' : ''}</button>
+            <button type="button" onClick={() => shareReport(viewReport)}>Share</button>
+            {isManager && <button type="button" className="danger-text" onClick={() => handleDeleteReport(viewReport.id)}>Delete Report</button>}
           </div>
         </>)}
       </Modal>

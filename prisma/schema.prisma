@@ -219,7 +219,7 @@ model Partner {
 model Report {
   id          String   @id @default(cuid())
   name        String
-  description String?
+  description String?  @db.Text
   reportDate  DateTime
   fileUrl     String?
   fileName    String?

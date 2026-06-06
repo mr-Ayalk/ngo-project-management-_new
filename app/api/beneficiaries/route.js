@@ -3,17 +3,18 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, formatMonthYear, requireAuth, requireManager } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
+import { getBeneficiaryStatusLabel, getBeneficiaryStatusBadge } from '@/lib/beneficiary-status';
 
 function formatBeneficiary(b) {
-  const statusMap = { active: 'on-track', 'follow-up': 'at-risk', inactive: 'inactive' };
   return {
     id: b.id,
     name: b.name,
     email: b.email,
     program: b.program,
     region: b.region,
-    status: statusMap[b.status] || b.status,
-    statusLabel: b.status === 'active' ? 'Active' : b.status === 'follow-up' ? 'Follow-up' : 'Inactive',
+    status: b.status,
+    statusBadge: getBeneficiaryStatusBadge(b.status),
+    statusLabel: getBeneficiaryStatusLabel(b.status),
     date: formatMonthYear(b.enrolledDate),
     enrolledDate: b.enrolledDate,
     programs: b.projects?.length || 1,
@@ -27,20 +28,30 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const region = searchParams.get('region');
+    const program = searchParams.get('program');
+    const status = searchParams.get('status');
     const search = searchParams.get('search');
 
     const where = {};
     if (region && region !== 'all') where.region = region;
+    if (program && program !== 'all') where.program = program;
+    if (status && status !== 'all') where.status = status;
     if (search) where.name = { contains: search, mode: 'insensitive' };
 
-    const [beneficiaries, org] = await Promise.all([
+    const [beneficiaries, org, allForFilters] = await Promise.all([
       prisma.beneficiary.findMany({
         where,
         include: { projects: true },
         orderBy: { enrolledDate: 'desc' },
       }),
       prisma.organization.findFirst(),
+      prisma.beneficiary.findMany({
+        select: { program: true, region: true, status: true },
+      }),
     ]);
+
+    const programs = [...new Set(allForFilters.map((b) => b.program).filter(Boolean))].sort();
+    const regions = [...new Set(allForFilters.map((b) => b.region).filter(Boolean))].sort();
 
     return json({
       stats: {
@@ -53,7 +64,8 @@ export async function GET(req) {
         completionRate: org?.completionRate ?? 0,
       },
       beneficiaries: beneficiaries.map(formatBeneficiary),
-      regions: ['Nairobi', 'Lagos', 'Eldoret', 'Addis Ababa', 'Dar es Salaam', 'Oromia', 'South West', 'Southern'],
+      regions,
+      programs,
     });
   } catch (err) {
     console.error('Beneficiaries GET error:', err);
@@ -82,6 +94,7 @@ export async function POST(req) {
         enrolledDate: body.enrolledDate ? new Date(body.enrolledDate) : new Date(),
         notes: body.notes,
       },
+      include: { projects: true },
     });
 
     await logActivity({

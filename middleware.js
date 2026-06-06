@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
 const PUBLIC_API = ['/api/auth/login'];
-const PUBLIC_PAGES = ['/login'];
+const PUBLIC_PAGES = ['/', '/login'];
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;
@@ -26,10 +26,6 @@ async function verifyToken(token) {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
 
   if (pathname.startsWith('/api/')) {
     if (PUBLIC_API.some((p) => pathname === p)) {
@@ -63,5 +59,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/dashboard/:path*'],
+  matcher: ['/api/:path*'],
 };

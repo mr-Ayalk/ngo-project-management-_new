@@ -34,6 +34,7 @@ export async function GET(req) {
         taskId: m.taskId,
         initials: getInitials(m.sender.name),
         color: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        isOwn: m.senderId === auth.user.id,
         time: timeAgo(m.createdAt),
         createdAt: m.createdAt,
       })),
@@ -68,26 +69,34 @@ export async function POST(req) {
         where: { id: body.taskId },
         select: { title: true, assigneeId: true, projectId: true },
       });
-      const members = await prisma.projectMember.findMany({
-        where: { projectId: body.projectId },
-        select: { userId: true },
-      });
-      const project = await prisma.project.findUnique({
-        where: { id: body.projectId },
-        select: { managerId: true, leadId: true },
-      });
+      const [members, project, admins] = await Promise.all([
+        prisma.projectMember.findMany({
+          where: { projectId: body.projectId },
+          select: { userId: true },
+        }),
+        prisma.project.findUnique({
+          where: { id: body.projectId },
+          select: { name: true, managerId: true, leadId: true },
+        }),
+        prisma.user.findMany({
+          where: { role: { in: ['admin', 'manager', 'project_manager'] }, isActive: true },
+          select: { id: true },
+        }),
+      ]);
+
       const recipientIds = new Set();
       members.forEach((m) => { if (m.userId !== auth.user.id) recipientIds.add(m.userId); });
-      if (project?.managerId !== auth.user.id) recipientIds.add(project.managerId);
+      if (project?.managerId && project.managerId !== auth.user.id) recipientIds.add(project.managerId);
       if (project?.leadId && project.leadId !== auth.user.id) recipientIds.add(project.leadId);
       if (task?.assigneeId && task.assigneeId !== auth.user.id) recipientIds.add(task.assigneeId);
+      admins.forEach((a) => { if (a.id !== auth.user.id) recipientIds.add(a.id); });
 
       if (recipientIds.size > 0) {
         await prisma.notification.createMany({
           data: [...recipientIds].map((userId) => ({
             userId,
-            title: `Message on "${task?.title || 'task'}"`,
-            message: `${message.sender.name}: ${body.content.trim().slice(0, 80)}`,
+            title: `New message on "${task?.title || 'task'}"`,
+            message: `${message.sender.name} in ${project?.name || 'project'}: ${body.content.trim().slice(0, 100)}`,
             type: 'task_message',
             projectId: body.projectId,
             taskId: body.taskId,

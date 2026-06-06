@@ -28,7 +28,30 @@ body {
   font-family: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
   background: #f8fafc;
   color: #1e293b;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+body, button, input, select, textarea {
+  font-size: 16px;
+}
+
+.nav-item,
+.card-title,
+.page-header p,
+.task-title,
+.table-head span,
+.bene-cell,
+.msg-content,
+.detail-meta {
+  font-size: 16px;
+}
+
+.page-header p,
+.detail-meta,
+.report-preview {
+  font-size: 15px;
 }
 
 /* Sidebar */
@@ -621,3 +644,98 @@ body {
 .content-area::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Location map */
+.location-map {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.location-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 14px;
+}
+
+.location-map-label { font-weight: 600; color: #0f172a; }
+.location-map-coords { color: #64748b; font-size: 12px; }
+.location-map-frame { width: 100%; height: 220px; border: none; display: block; }
+.location-map-empty { min-height: 120px; display: flex; align-items: center; justify-content: center; }
+.location-map-placeholder { text-align: center; color: #64748b; font-size: 14px; padding: 24px; }
+.location-map-pin { font-size: 28px; display: block; margin-bottom: 8px; }
+
+/* Beneficiary status badges */
+.status-badge.status-enrolled { background: #d1fae5; color: #065f46; }
+.status-badge.status-followup { background: #fef3c7; color: #92400e; }
+.status-badge.status-completed { background: #e2e8f0; color: #475569; }
+
+/* Chat / messages */
+.chat-panel { display: flex; flex-direction: column; gap: 12px; }
+.chat-list { min-height: 420px; max-height: 520px; display: flex; flex-direction: column; }
+.message-bubble { align-items: flex-start; }
+.message-bubble.own { flex-direction: row-reverse; text-align: right; }
+.message-bubble.own .msg-body { align-items: flex-end; display: flex; flex-direction: column; }
+.message-bubble.own .msg-content {
+  background: var(--primary-muted);
+  border: 1px solid var(--primary-light);
+  border-radius: 12px 12px 4px 12px;
+  padding: 10px 14px;
+}
+.message-bubble:not(.own) .msg-content {
+  background: #f1f5f9;
+  border-radius: 12px 12px 12px 4px;
+  padding: 10px 14px;
+}
+.msg-delete-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 4px;
+  padding: 0;
+}
+.msg-delete-btn:hover { color: #ef4444; }
+.msg-avatar.own { margin-left: 8px; }
+
+.dark .message-bubble:not(.own) .msg-content { background: #334155 !important; color: #e2e8f0 !important; }
+.dark .message-bubble.own .msg-content { background: rgba(13, 148, 136, 0.2) !important; border-color: rgba(13, 148, 136, 0.3) !important; color: #e2e8f0 !important; }
+
+/* Report detail */
+.report-preview { color: #64748b; font-size: 14px; margin-top: 8px; line-height: 1.5; }
+.report-detail-body { margin: 16px 0; }
+.report-detail-heading { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+.report-detail-content {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  color: #334155;
+}
+.report-detail-date { margin-bottom: 4px; }
+.detail-meta { font-size: 15px; color: #64748b; margin-bottom: 8px; }
+.card-delete-btn, .danger-text { color: #dc2626; background: none; border: none; font-size: 13px; cursor: pointer; margin-top: 8px; }
+.card-delete-btn:hover, .danger-text:hover { text-decoration: underline; }
+
+.dark .report-detail-content { background: #1e293b; border-color: rgba(255,255,255,0.08); color: #cbd5e1; }
+
+/* Performance indicators */
+.page-loading { padding: 48px; text-align: center; color: #64748b; display: flex; flex-direction: column; align-items: center; gap: 12px; font-size: 15px; }
+.refresh-bar { height: 3px; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); animation: refresh-pulse 1s ease infinite; }
+@keyframes refresh-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+.dark .location-map { background: #1e293b; border-color: rgba(255,255,255,0.08); }
+.dark .location-map-header { background: #0f172a; border-color: rgba(255,255,255,0.08); }
+.dark .location-map-label { color: #e2e8f0; }

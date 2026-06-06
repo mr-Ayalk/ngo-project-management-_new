@@ -4,8 +4,8 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata = {
-  title: 'NGO Project Management',
-  description: 'Professional project management platform for NGOs — track projects, budgets, beneficiaries, and impact.',
+  title: 'Engage Now Africa — Project Management',
+  description: 'Empowering communities across Africa. Manage NGO projects, track impact, and collaborate with the ENA workspace.',
 };
 
 export default function RootLayout({ children }) {
