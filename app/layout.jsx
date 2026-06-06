@@ -2,6 +2,7 @@ import './globals.css';
 import './design-system.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/components/AuthProvider';
+import AppToaster from '@/components/AppToaster';
 
 export const metadata = {
   title: 'Engage Now Africa — Project Management',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
       <body>
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
+          <AppToaster />
         </ThemeProvider>
       </body>
     </html>

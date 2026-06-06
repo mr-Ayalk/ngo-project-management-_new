@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import toast from '@/lib/toast';
 
 const PRIORITY_LABELS = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' };
 const STATUS_LABELS = { todo: 'TODO', in_progress: 'IN PROGRESS', completed: 'DONE' };
@@ -47,7 +48,7 @@ export default function TaskDetailView({ task, project, onBack, currentUser, onN
       setInput('');
       onNotify?.();
     } catch (err) {
-      alert(err.message || 'Failed to post comment');
+      toast.error(err.message || 'Failed to post comment');
     } finally {
       setSubmitting(false);
     }

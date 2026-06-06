@@ -437,6 +437,15 @@ async function main() {
     await prisma.message.create({ data: m });
   }
 
+  const logisticsShipments = [
+    { reference: 'SHP-240501', origin: 'Addis Ababa HQ', destination: 'Bahir Dar Field Office', carrier: 'ENA Transport', status: 'in_transit', priority: 'high', items: 'Medical kits', quantity: 50, expectedDate: new Date('2024-06-15'), createdById: admin.id },
+    { reference: 'SHP-240502', origin: 'Dire Dawa Warehouse', destination: 'Harar Community Center', carrier: 'FastFreight ET', status: 'pending', priority: 'normal', items: 'School supplies', quantity: 120, expectedDate: new Date('2024-06-20'), createdById: admin.id },
+    { reference: 'SHP-240503', origin: 'Addis Ababa HQ', destination: 'Hawassa Regional Office', carrier: 'ENA Transport', status: 'delivered', priority: 'normal', items: 'Laptops & tablets', quantity: 15, expectedDate: new Date('2024-05-28'), deliveredDate: new Date('2024-05-27'), createdById: admin.id },
+  ];
+  for (const s of logisticsShipments) {
+    await prisma.logisticsShipment.create({ data: s });
+  }
+
   console.log('Seed completed successfully!');
   console.log('Login credentials: ayalkbet@bamah.com / password123');
 }

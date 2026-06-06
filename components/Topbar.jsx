@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
+import UserAvatar from '@/components/UserAvatar';
 import api from '@/lib/api';
 import { getRoleLabel } from '@/lib/roles';
 
@@ -53,10 +54,6 @@ const Topbar = ({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-
-  const initials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : '??';
 
   const roleLabel = getRoleLabel(user);
 
@@ -159,7 +156,7 @@ const Topbar = ({
             className="user-chip user-chip-btn"
             onClick={() => { setShowProfile((s) => !s); setShowNotifs(false); }}
           >
-            <div className="avatar">{initials}</div>
+            <UserAvatar user={user} />
             <div>
               <div className="user-name">{user?.name || 'User'}</div>
               <div className="user-role">{roleLabel}</div>
@@ -168,7 +165,7 @@ const Topbar = ({
           {showProfile && (
             <div className="profile-dropdown">
               <div className="profile-dropdown-header">
-                <div className="avatar lg">{initials}</div>
+                <UserAvatar user={user} size="lg" />
                 <div>
                   <div className="user-name">{user?.name}</div>
                   <div className="user-role">{user?.email}</div>

@@ -4,7 +4,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import api from '@/lib/api';
 import Modal from '@/components/Modal';
-import Toast from '@/components/Toast';
+import toast from '@/lib/toast';
+import { confirmToast } from '@/lib/confirmToast';
+import MessagesInbox from '@/components/MessagesInbox';
+import DocumentsLibrary from '@/components/DocumentsLibrary';
+import LogisticsPage from '@/components/LogisticsPage';
+import ProfileSettings from '@/components/ProfileSettings';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
@@ -97,7 +102,6 @@ const DashboardPages = ({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -108,11 +112,12 @@ const DashboardPages = ({
   const [reports, setReports] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [docSearch, setDocSearch] = useState('');
+  const [logistics, setLogistics] = useState(null);
   const [partners, setPartners] = useState([]);
   const [organization, setOrganization] = useState(null);
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  const [messages, setMessages] = useState(null);
   const [activities, setActivities] = useState([]);
 
   const [lookup, setLookup] = useState({ users: [], projects: [] });
@@ -132,7 +137,6 @@ const DashboardPages = ({
   const [beneSearch, setBeneSearch] = useState('');
   const debouncedProjectSearch = useDebouncedValue(projectSearch, 350);
   const debouncedBeneSearch = useDebouncedValue(beneSearch, 350);
-  const messagesEndRef = useRef(null);
   const pageDataLoaded = useRef({});
   const [docCategory, setDocCategory] = useState('all');
   const [orgForm, setOrgForm] = useState({
@@ -140,15 +144,12 @@ const DashboardPages = ({
     dateFormat: 'DD/MM/YYYY', timezone: 'Africa/Addis_Ababa', fiscalYearStart: 'July',
   });
   const [selectedTask, setSelectedTask] = useState(null);
-  const [msgProjectId, setMsgProjectId] = useState('');
-  const [msgTaskId, setMsgTaskId] = useState('');
-  const [msgTasks, setMsgTasks] = useState([]);
   const [newStaffForm, setNewStaffForm] = useState({ name: '', email: '', password: '', staffRole: 'field_worker' });
   const [isPinned, setIsPinned] = useState(false);
 
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
-  const [chartRange, setChartRange] = useState('month');
+  const [msgInitialSelection, setMsgInitialSelection] = useState(null);
 
   const [projectForm, setProjectForm] = useState(EMPTY_PROJECT);
   const [taskForm, setTaskForm] = useState(EMPTY_TASK);
@@ -165,13 +166,12 @@ const DashboardPages = ({
   const [viewReport, setViewReport] = useState(null);
   const [viewDocument, setViewDocument] = useState(null);
   const [editUser, setEditUser] = useState(null);
-  const [messageInput, setMessageInput] = useState('');
   const [draggedTask, setDraggedTask] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    if (type === 'error') toast.error(message);
+    else toast.success(message);
   }, []);
 
   const closeModal = () => {
@@ -238,35 +238,42 @@ const DashboardPages = ({
           setDocuments(data.documents || data);
           break;
         }
+        case 'logistics':
+          setLogistics(await api.logistics());
+          break;
         case 'partners':
           setPartners(await api.partners());
           break;
         case 'messages':
+          await loadLookup();
           break;
         case 'settings': {
-          const [org, userList] = await Promise.all([api.organization(), api.users()]);
-          setOrganization(org);
-          setOrgForm({
-            name: org.name || '',
-            country: org.country || '',
-            email: org.email || '',
-            phone: org.phone || '',
-            location: org.location || '',
-            description: org.description || '',
-            dateFormat: org.dateFormat || 'DD/MM/YYYY',
-            timezone: org.timezone || 'Africa/Addis_Ababa',
-            fiscalYearStart: org.fiscalYearStart || 'July',
-          });
-          setUsers(userList);
+          const tasks = [];
           if (user?.role === 'admin') {
-            try {
-              setAuditLogs(await api.auditLogs());
-            } catch {
-              setAuditLogs([]);
-            }
-          } else {
-            setAuditLogs([]);
+            tasks.push(api.organization().then((org) => {
+              setOrganization(org);
+              setOrgForm({
+                name: org.name || '',
+                country: org.country || '',
+                email: org.email || '',
+                phone: org.phone || '',
+                location: org.location || '',
+                description: org.description || '',
+                dateFormat: org.dateFormat || 'DD/MM/YYYY',
+                timezone: org.timezone || 'Africa/Addis_Ababa',
+                fiscalYearStart: org.fiscalYearStart || 'July',
+              });
+            }));
           }
+          if (canManageUsers(user)) {
+            tasks.push(api.users().then(setUsers));
+          }
+          if (user?.role === 'admin') {
+            tasks.push(
+              api.auditLogs().then(setAuditLogs).catch(() => setAuditLogs([]))
+            );
+          }
+          await Promise.all(tasks);
           break;
         }
         default:
@@ -347,13 +354,10 @@ const DashboardPages = ({
       try {
         if (pendingNav.openMessages) {
           onNavigate?.('messages');
-          setMsgProjectId(pendingNav.projectId);
-          const detail = await api.project(pendingNav.projectId);
-          setMsgTasks(detail.tasks || []);
-          if (pendingNav.taskId) {
-            setMsgTaskId(pendingNav.taskId);
-            setMessages(await api.messages({ projectId: pendingNav.projectId, taskId: pendingNav.taskId }));
-          }
+          setMsgInitialSelection({
+            projectId: pendingNav.projectId,
+            taskId: pendingNav.taskId || null,
+          });
           onPendingNavHandled?.();
           return;
         }
@@ -396,32 +400,97 @@ const DashboardPages = ({
   useEffect(() => {
     if (currentPage !== 'dashboard' || !dashboard?.chart || !chartRef.current) return;
     if (chartInstance.current) chartInstance.current.destroy();
-    const labels = chartRange === 'month'
-      ? dashboard.chart.labels
-      : ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    const planned = chartRange === 'month' ? dashboard.chart.planned : [15, 35, 55, 75];
-    const actual = chartRange === 'month' ? dashboard.chart.actual : [14, 33, 52, 72];
+
+    const { labels, tasksCompleted, newTasks, avgProgress } = dashboard.chart;
     const ctx = chartRef.current.getContext('2d');
+    const barGradient = ctx.createLinearGradient(0, 0, 0, 280);
+    barGradient.addColorStop(0, 'rgba(18, 115, 222, 0.85)');
+    barGradient.addColorStop(1, 'rgba(18, 115, 222, 0.35)');
+
     chartInstance.current = new Chart(ctx, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels,
         datasets: [
-          { label: 'Planned', data: planned, borderColor: '#d1d5db', borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false },
-          { label: 'Actual', data: actual, borderColor: '#1E75E5', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, backgroundColor: 'rgba(30,117,229,0.07)' },
+          {
+            type: 'bar',
+            label: 'Tasks Completed',
+            data: tasksCompleted,
+            backgroundColor: barGradient,
+            borderRadius: 8,
+            borderSkipped: false,
+            yAxisID: 'y',
+            order: 2,
+          },
+          {
+            type: 'bar',
+            label: 'New Tasks',
+            data: newTasks,
+            backgroundColor: 'rgba(148, 163, 184, 0.45)',
+            borderRadius: 8,
+            borderSkipped: false,
+            yAxisID: 'y',
+            order: 3,
+          },
+          {
+            type: 'line',
+            label: 'Avg Project Progress %',
+            data: avgProgress,
+            borderColor: '#0f766e',
+            backgroundColor: 'rgba(15, 118, 110, 0.08)',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: '#0f766e',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            tension: 0.35,
+            fill: true,
+            yAxisID: 'y1',
+            order: 1,
+          },
         ],
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: { boxWidth: 10, boxHeight: 10, font: { size: 11, family: 'Plus Jakarta Sans' }, padding: 16 },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                if (ctx.dataset.yAxisID === 'y1') return ` ${ctx.dataset.label}: ${ctx.raw}%`;
+                return ` ${ctx.dataset.label}: ${ctx.raw}`;
+              },
+            },
+          },
+        },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10, family: 'DM Sans' }, color: '#9ca3af' } },
-          y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10, family: 'DM Sans' }, color: '#9ca3af' }, min: 0, max: 100 },
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+          y: {
+            position: 'left',
+            beginAtZero: true,
+            grid: { color: '#f1f5f9' },
+            ticks: { stepSize: 1, font: { size: 10 }, color: '#94a3b8' },
+            title: { display: true, text: 'Task count', font: { size: 10 }, color: '#94a3b8' },
+          },
+          y1: {
+            position: 'right',
+            beginAtZero: true,
+            max: 100,
+            grid: { drawOnChartArea: false },
+            ticks: { callback: (v) => `${v}%`, font: { size: 10 }, color: '#94a3b8' },
+            title: { display: true, text: 'Progress', font: { size: 10 }, color: '#94a3b8' },
+          },
         },
       },
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-  }, [currentPage, dashboard, chartRange]);
+  }, [currentPage, dashboard]);
 
   const statusLabel = (s) => (s === 'on-track' ? 'On Track' : s === 'at-risk' ? 'At Risk' : 'Delayed');
 
@@ -572,7 +641,11 @@ const DashboardPages = ({
   };
 
   const handleDeleteProject = async (id) => {
-    if (!confirm('Delete this project?')) return;
+    const ok = await confirmToast('Delete this project?', {
+      description: 'All tasks and related data will be removed.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     try {
       await api.deleteProject(id);
       showToast('Project deleted');
@@ -835,79 +908,12 @@ const DashboardPages = ({
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!messageInput.trim()) return;
-    if (!msgProjectId || !msgTaskId) {
-      showToast('Please select a project and task first', 'error');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await api.sendMessage({
-        content: messageInput,
-        projectId: msgProjectId,
-        taskId: msgTaskId,
-      });
-      setMessageInput('');
-      setMessages(await api.messages({ projectId: msgProjectId, taskId: msgTaskId }));
-      showToast('Message sent');
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const loadTaskMessages = useCallback(async (projectId, taskId) => {
-    if (!projectId || !taskId) return;
-    try {
-      setMessages(await api.messages({ projectId, taskId }));
-    } catch {
-      setMessages({ messages: [] });
-    }
-  }, []);
-
-  const handleMsgProjectChange = async (projectId) => {
-    setMsgProjectId(projectId);
-    setMsgTaskId('');
-    setMessages({ messages: [] });
-    if (projectId) {
-      try {
-        const detail = await api.project(projectId);
-        setMsgTasks(detail.tasks || []);
-      } catch {
-        setMsgTasks([]);
-      }
-    } else {
-      setMsgTasks([]);
-    }
-  };
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages?.messages]);
-
-  useEffect(() => {
-    if (currentPage !== 'messages' || !msgProjectId || !msgTaskId) return undefined;
-    loadTaskMessages(msgProjectId, msgTaskId);
-    const interval = setInterval(() => loadTaskMessages(msgProjectId, msgTaskId), 10000);
-    return () => clearInterval(interval);
-  }, [currentPage, msgProjectId, msgTaskId, loadTaskMessages]);
-
-  const handleDeleteMessage = async (msgId) => {
-    if (!confirm('Delete this message?')) return;
-    try {
-      await api.deleteMessage(msgId);
-      await loadTaskMessages(msgProjectId, msgTaskId);
-      showToast('Message deleted');
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
   const handleDeleteDocument = async (docId) => {
-    if (!confirm('Delete this document permanently?')) return;
+    const ok = await confirmToast('Delete this document permanently?', {
+      description: 'This file will be removed from the library.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     try {
       await api.deleteDocument(docId);
       showToast('Document deleted');
@@ -919,7 +925,11 @@ const DashboardPages = ({
   };
 
   const handleDeleteReport = async (reportId) => {
-    if (!confirm('Delete this report permanently?')) return;
+    const ok = await confirmToast('Delete this report permanently?', {
+      description: 'This report and its attachments will be removed.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     try {
       await api.deleteReport(reportId);
       showToast('Report deleted');
@@ -1009,7 +1019,6 @@ const DashboardPages = ({
   return (
     <div className="content" onClick={() => setMenuOpen(null)}>
       {refreshing && <div className="refresh-bar" aria-hidden="true" />}
-      <Toast message={toast?.message} type={toast?.type} />
 
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
@@ -1041,18 +1050,30 @@ const DashboardPages = ({
             </div>
           </div>
           <div className="mid-row">
-            <div className="card">
+            <div className="card chart-card">
               <div className="card-header">
-                <span className="card-title">Project Overview</span>
-                <select className="card-select" value={chartRange} onChange={(e) => setChartRange(e.target.value)}>
-                  <option value="month">This Month</option>
-                  <option value="week">Last Month</option>
-                </select>
+                <div>
+                  <span className="card-title">Weekly Delivery Metrics</span>
+                  <p className="chart-subtitle">Tasks completed vs new work — with average project progress</p>
+                </div>
+                {dashboard.chart.overdueTasks > 0 && (
+                  <span className="chart-overdue-badge">{dashboard.chart.overdueTasks} overdue tasks</span>
+                )}
               </div>
-              <div className="chart-area"><canvas ref={chartRef} height="140"></canvas></div>
-              <div className="chart-legend">
-                <div className="chart-legend-item"><div className="legend-dot" style={{ background: '#d1d5db' }}></div>Planned</div>
-                <div className="chart-legend-item"><div className="legend-dot" style={{ background: '#1E75E5' }}></div>Actual</div>
+              <div className="chart-area chart-area-tall"><canvas ref={chartRef} height="180"></canvas></div>
+              <div className="chart-stats-row">
+                <div className="chart-stat-pill">
+                  <span className="chart-stat-val">{dashboard.chart.summary?.totalCompletedThisPeriod ?? 0}</span>
+                  <span className="chart-stat-label">Completed (5 wks)</span>
+                </div>
+                <div className="chart-stat-pill">
+                  <span className="chart-stat-val">{dashboard.chart.summary?.totalCreatedThisPeriod ?? 0}</span>
+                  <span className="chart-stat-label">New tasks (5 wks)</span>
+                </div>
+                <div className="chart-stat-pill">
+                  <span className="chart-stat-val">{dashboard.chart.summary?.currentAvgProgress ?? 0}%</span>
+                  <span className="chart-stat-label">Avg progress now</span>
+                </div>
               </div>
             </div>
             <div className="card">
@@ -1347,6 +1368,29 @@ const DashboardPages = ({
               )) : (
                 <p className="cal-empty-note">No upcoming events this month.</p>
               )}
+
+              {calendar.overdue?.length > 0 && (
+                <>
+                  <h3 className="cal-sidebar-title cal-overdue-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    Overdue ({calendar.overdue.length})
+                  </h3>
+                  <p className="cal-sidebar-sub cal-overdue-sub">Deadlines that have passed</p>
+                  {calendar.overdue.map((item) => (
+                    <div key={`${item.type}-${item.id}`} className="event-item event-item-overdue">
+                      <div className="event-dot event-dot-warning" />
+                      <div className="event-body">
+                        <div className="ev-title">{item.title}</div>
+                        <div className="ev-date">{item.date}{item.project ? ` · ${item.project}` : ''}</div>
+                        <div className="ev-overdue-tag">{item.daysOverdue} day{item.daysOverdue !== 1 ? 's' : ''} overdue · {item.type === 'task' ? 'Task' : 'Event'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </aside>
           </div>
         </>
@@ -1448,33 +1492,64 @@ const DashboardPages = ({
 
       {/* ── DOCUMENTS ── */}
       {currentPage === 'documents' && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Documents</h1></div>
-            <button className="btn-primary" onClick={async () => { await loadLookup(); setDocumentForm({ ...EMPTY_DOCUMENT, projectId: lookup.projects[0]?.id || '' }); setModal('document'); }}>+ Upload</button>
-          </div>
-          <div className="category-tabs">
-            {DOC_CATEGORIES.map((cat) => (
-              <button key={cat} className={docCategory === cat ? 'active' : ''} onClick={() => setDocCategory(cat)}>{cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}</button>
-            ))}
-          </div>
-          <div className="doc-grid">
-            {documents.map((doc) => (
-              <div key={doc.id} className="doc-card">
-                <div className="doc-card-icon">{doc.icon}</div>
-                <div className="doc-card-name">{doc.name}</div>
-                <div className="doc-card-meta">{doc.date}</div>
-                <div className="doc-card-actions">
-                  <button type="button" onClick={() => { setViewDocument(doc); setModal('documentView'); }}>View</button>
-                  <button type="button" onClick={() => downloadDocument(doc)}>Download</button>
-                  {isManager && (
-                    <button type="button" className="danger-text" onClick={() => handleDeleteDocument(doc.id)}>Delete</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <DocumentsLibrary
+          documents={documents}
+          categories={DOC_CATEGORIES}
+          activeCategory={docCategory}
+          onCategoryChange={setDocCategory}
+          searchQuery={docSearch}
+          onSearchChange={setDocSearch}
+          isManager={isManager}
+          onView={(doc) => { setViewDocument(doc); setModal('documentView'); }}
+          onDownload={downloadDocument}
+          onDelete={handleDeleteDocument}
+          onUpload={async () => {
+            await loadLookup();
+            setDocumentForm({ ...EMPTY_DOCUMENT, projectId: lookup.projects[0]?.id || '' });
+            setModal('document');
+          }}
+        />
+      )}
+
+      {/* ── LOGISTICS ── */}
+      {currentPage === 'logistics' && (
+        <LogisticsPage
+          data={logistics}
+          loading={loading && !logistics}
+          isManager={isManager}
+          submitting={submitting}
+          onRefresh={() => loadPageData(false)}
+          onSave={async (form) => {
+            setSubmitting(true);
+            try {
+              const body = { ...form };
+              delete body.id;
+              if (form.id) {
+                await api.updateLogistics(form.id, body);
+                showToast('Shipment updated');
+              } else {
+                await api.createLogistics(body);
+                showToast('Shipment created');
+              }
+              loadPageData(false);
+              return true;
+            } catch (err) {
+              showToast(err.message, 'error');
+              return false;
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+          onDelete={async (id) => {
+            try {
+              await api.deleteLogistics(id);
+              showToast('Shipment deleted');
+              loadPageData(false);
+            } catch (err) {
+              showToast(err.message, 'error');
+            }
+          }}
+        />
       )}
 
       {/* ── PARTNERS ── */}
@@ -1504,107 +1579,67 @@ const DashboardPages = ({
 
       {/* ── MESSAGES ── */}
       {currentPage === 'messages' && (
-        <>
-          <div className="page-header">
-            <h1>Team Discussions</h1>
-            <p>Select a project and task to collaborate with your team in real time.</p>
-          </div>
-          <div className="msg-selectors">
-            <div className="form-field">
-              <label>Project</label>
-              <select value={msgProjectId} onChange={(e) => handleMsgProjectChange(e.target.value)}>
-                <option value="">Select project...</option>
-                {lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label>Task</label>
-              <select
-                value={msgTaskId}
-                onChange={(e) => {
-                  setMsgTaskId(e.target.value);
-                  if (msgProjectId && e.target.value) loadTaskMessages(msgProjectId, e.target.value);
-                }}
-                disabled={!msgProjectId}
-              >
-                <option value="">Select task...</option>
-                {msgTasks.map((t) => <option key={t.id} value={t.id}>{t.title || t.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="messages-panel chat-panel">
-            <div className="messages-list chat-list">
-              {messages?.messages?.length ? messages.messages.map((msg) => (
-                <div key={msg.id} className={`message-bubble${msg.isOwn ? ' own' : ''}`}>
-                  {!msg.isOwn && <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>}
-                  <div className="msg-body">
-                    <div className="msg-sender">
-                      {msg.isOwn ? 'You' : msg.senderName}
-                      <span className="msg-time">{msg.time}</span>
-                    </div>
-                    <div className="msg-content">{msg.content}</div>
-                    {(msg.isOwn || isManager) && (
-                      <button type="button" className="msg-delete-btn" onClick={() => handleDeleteMessage(msg.id)} aria-label="Delete message">Delete</button>
-                    )}
-                  </div>
-                  {msg.isOwn && <div className="msg-avatar own" style={{ background: msg.color }}>{msg.initials}</div>}
-                </div>
-              )) : <p className="messages-empty">{msgProjectId && msgTaskId ? 'No messages yet. Start the discussion!' : 'Select a project and task above to view messages.'}</p>}
-              <div ref={messagesEndRef} />
-            </div>
-            <form className="message-compose chat-compose" onSubmit={handleSendMessage}>
-              <input type="text" placeholder="Type your message…" value={messageInput} onChange={(e) => setMessageInput(e.target.value)} disabled={!msgProjectId || !msgTaskId || submitting} />
-              <button className="btn-primary" type="submit" disabled={submitting || !msgProjectId || !msgTaskId || !messageInput.trim()}>Send</button>
-            </form>
-          </div>
-        </>
+        <MessagesInbox
+          user={user}
+          isManager={isManager}
+          lookup={lookup}
+          onNavigate={onNavigate}
+          initialSelection={msgInitialSelection}
+          onInitialSelectionHandled={() => setMsgInitialSelection(null)}
+        />
       )}
 
       {/* ── SETTINGS ── */}
-      {currentPage === 'settings' && organization && (
+      {currentPage === 'settings' && (
         <>
           <div className="page-header">
             <h1>Settings</h1>
-            <p>Manage your organization profile, team access, and security preferences.</p>
+            <p>Manage your profile{user?.role === 'admin' ? ', organization, team access,' : ''} and security preferences.</p>
           </div>
+          <ProfileSettings />
           <div className="settings-grid">
-            <div className="settings-card">
-              <div className="settings-card-title">Organization Info</div>
-              {['name', 'country', 'email', 'phone', 'location'].map((field) => (
-                <div key={field} className="form-field">
-                  <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-                  <input value={orgForm[field] || ''} onChange={(e) => setOrgForm({ ...orgForm, [field]: e.target.value })} />
+            {user?.role === 'admin' && organization && (
+              <>
+                <div className="settings-card">
+                  <div className="settings-card-title">Organization Info</div>
+                  <p className="profile-settings-hint">Only administrators can edit organization details.</p>
+                  {['name', 'country', 'email', 'phone', 'location'].map((field) => (
+                    <div key={field} className="form-field">
+                      <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                      <input value={orgForm[field] || ''} onChange={(e) => setOrgForm({ ...orgForm, [field]: e.target.value })} />
+                    </div>
+                  ))}
+                  <div className="form-field"><label>Description</label><textarea value={orgForm.description || ''} onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })} /></div>
+                  <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
                 </div>
-              ))}
-              <div className="form-field"><label>Description</label><textarea value={orgForm.description || ''} onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })} /></div>
-              <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
-            </div>
-            <div className="settings-card">
-              <div className="settings-card-title">Date & Time Configuration</div>
-              <div className="form-field">
-                <label>Date Format</label>
-                <select value={orgForm.dateFormat} onChange={(e) => setOrgForm({ ...orgForm, dateFormat: e.target.value })}>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Timezone</label>
-                <select value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })}>
-                  <option value="Africa/Addis_Ababa">Africa/Addis Ababa (EAT)</option>
-                  <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
-                  <option value="UTC">UTC</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Fiscal Year Start</label>
-                <select value={orgForm.fiscalYearStart} onChange={(e) => setOrgForm({ ...orgForm, fiscalYearStart: e.target.value })}>
-                  {['January', 'April', 'July', 'October'].map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Date Settings'}</button>
-            </div>
+                <div className="settings-card">
+                  <div className="settings-card-title">Date & Time Configuration</div>
+                  <div className="form-field">
+                    <label>Date Format</label>
+                    <select value={orgForm.dateFormat} onChange={(e) => setOrgForm({ ...orgForm, dateFormat: e.target.value })}>
+                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>Timezone</label>
+                    <select value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })}>
+                      <option value="Africa/Addis_Ababa">Africa/Addis Ababa (EAT)</option>
+                      <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
+                      <option value="UTC">UTC</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>Fiscal Year Start</label>
+                    <select value={orgForm.fiscalYearStart} onChange={(e) => setOrgForm({ ...orgForm, fiscalYearStart: e.target.value })}>
+                      {['January', 'April', 'July', 'October'].map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Date Settings'}</button>
+                </div>
+              </>
+            )}
             {canManageUsers(user) && (
               <div className="settings-card">
                 <div className="settings-card-title">Add Staff Member</div>
@@ -1691,7 +1726,25 @@ const DashboardPages = ({
           </div>
           <div className="form-field"><label>Due Date</label><input type="date" value={taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })} /></div>
           <div className="form-actions">
-            {taskForm.id && <button type="button" className="btn-danger" onClick={async () => { if (confirm('Delete task?')) { await api.deleteTask(taskForm.id); showToast('Task deleted'); closeModal(); loadPageData(); } }}>Delete</button>}
+            {taskForm.id && (
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={async () => {
+                  const ok = await confirmToast('Delete this task?', {
+                    description: 'This task will be permanently removed.',
+                    confirmLabel: 'Delete',
+                  });
+                  if (!ok) return;
+                  await api.deleteTask(taskForm.id);
+                  showToast('Task deleted');
+                  closeModal();
+                  loadPageData();
+                }}
+              >
+                Delete
+              </button>
+            )}
             <button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Save Task'}</button>
           </div>

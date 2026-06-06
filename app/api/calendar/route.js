@@ -49,17 +49,68 @@ export async function GET(req) {
       days.push({ num: d, otherMonth: true });
     }
 
-    const upcoming = events.slice(0, 6).map((e) => {
-      const d = new Date(e.date);
-      const dateStr = e.allDay
-        ? `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · All Day`
-        : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${e.time || '9:00 AM'}`;
-      return { id: e.id, title: e.title, date: dateStr, color: e.color };
-    });
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const upcoming = events
+      .filter((e) => new Date(e.date) >= todayStart)
+      .slice(0, 6)
+      .map((e) => {
+        const d = new Date(e.date);
+        const dateStr = e.allDay
+          ? `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · All Day`
+          : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${e.time || '9:00 AM'}`;
+        return { id: e.id, title: e.title, date: dateStr, color: e.color, type: 'event' };
+      });
+
+    const [overdueEvents, overdueTasks] = await Promise.all([
+      prisma.calendarEvent.findMany({
+        where: { date: { lt: todayStart } },
+        include: { project: { select: { name: true } } },
+        orderBy: { date: 'desc' },
+        take: 8,
+      }),
+      prisma.task.findMany({
+        where: {
+          dueDate: { lt: todayStart },
+          status: { in: ['todo', 'in_progress'] },
+        },
+        include: { project: { select: { name: true } } },
+        orderBy: { dueDate: 'asc' },
+        take: 8,
+      }),
+    ]);
+
+    const overdue = [
+      ...overdueEvents.map((e) => {
+        const d = new Date(e.date);
+        return {
+          id: e.id,
+          title: e.title,
+          type: 'event',
+          project: e.project?.name || null,
+          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          daysOverdue: Math.ceil((todayStart - d) / (1000 * 60 * 60 * 24)),
+        };
+      }),
+      ...overdueTasks.map((t) => {
+        const d = new Date(t.dueDate);
+        return {
+          id: t.id,
+          title: t.title,
+          type: 'task',
+          project: t.project?.name || null,
+          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          daysOverdue: Math.ceil((todayStart - d) / (1000 * 60 * 60 * 24)),
+        };
+      }),
+    ]
+      .sort((a, b) => b.daysOverdue - a.daysOverdue)
+      .slice(0, 10);
 
     const monthLabel = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-    return json({ days, upcoming, monthLabel, year, month });
+    return json({ days, upcoming, overdue, monthLabel, year, month });
   } catch (err) {
     console.error('Calendar GET error:', err);
     return error('Failed to load calendar', 500);

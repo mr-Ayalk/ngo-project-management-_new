@@ -3,15 +3,6 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, formatCurrency, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
 
-function plannedProgress(project, asOf) {
-  const start = new Date(project.startDate).getTime();
-  const end = new Date(project.endDate).getTime();
-  const t = asOf.getTime();
-  if (t <= start) return 0;
-  if (t >= end) return 100;
-  return Math.round(((t - start) / (end - start)) * 100);
-}
-
 export async function GET(req) {
   try {
     const auth = await requireAuth(req);
@@ -106,32 +97,63 @@ export async function GET(req) {
     }));
 
     const chartLabels = [];
-    const chartPlanned = [];
-    const chartActual = [];
-    for (let i = 4; i >= 0; i--) {
-      const weekEnd = new Date(now);
+    const chartTasksCompleted = [];
+    const chartProgress = [];
+    const chartNewTasks = [];
+    const weekCount = 5;
+
+    const startOfDay = (d) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+
+    const today = startOfDay(now);
+
+    for (let i = weekCount - 1; i >= 0; i--) {
+      const weekEnd = new Date(today);
       weekEnd.setDate(weekEnd.getDate() - i * 7);
+      const weekStart = new Date(weekEnd);
+      weekStart.setDate(weekStart.getDate() - 6);
+
       chartLabels.push(
-        weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       );
 
+      const [completedCount, createdCount] = await Promise.all([
+        prisma.task.count({
+          where: {
+            status: 'completed',
+            updatedAt: { gte: weekStart, lte: weekEnd },
+          },
+        }),
+        prisma.task.count({
+          where: {
+            createdAt: { gte: weekStart, lte: weekEnd },
+          },
+        }),
+      ]);
+      chartTasksCompleted.push(completedCount);
+      chartNewTasks.push(createdCount);
+
       const activeAtWeek = projects.filter(
-        (p) => new Date(p.startDate) <= weekEnd && new Date(p.endDate) >= weekEnd
+        (p) => new Date(p.startDate) <= weekEnd && new Date(p.endDate) >= weekStart
       );
       if (activeAtWeek.length === 0) {
-        chartPlanned.push(0);
-        chartActual.push(0);
+        chartProgress.push(0);
       } else {
-        const plannedAvg = Math.round(
-          activeAtWeek.reduce((s, p) => s + plannedProgress(p, weekEnd), 0) / activeAtWeek.length
+        chartProgress.push(
+          Math.round(activeAtWeek.reduce((s, p) => s + p.progress, 0) / activeAtWeek.length)
         );
-        const actualAvg = Math.round(
-          activeAtWeek.reduce((s, p) => s + p.progress, 0) / activeAtWeek.length
-        );
-        chartPlanned.push(plannedAvg);
-        chartActual.push(actualAvg);
       }
     }
+
+    const overdueTasks = await prisma.task.count({
+      where: {
+        status: { in: ['todo', 'in_progress'] },
+        dueDate: { lt: today },
+      },
+    });
 
     return json({
       kpis: {
@@ -147,8 +169,15 @@ export async function GET(req) {
       },
       chart: {
         labels: chartLabels,
-        planned: chartPlanned,
-        actual: chartActual,
+        tasksCompleted: chartTasksCompleted,
+        newTasks: chartNewTasks,
+        avgProgress: chartProgress,
+        overdueTasks,
+        summary: {
+          totalCompletedThisPeriod: chartTasksCompleted.reduce((a, b) => a + b, 0),
+          totalCreatedThisPeriod: chartNewTasks.reduce((a, b) => a + b, 0),
+          currentAvgProgress: chartProgress[chartProgress.length - 1] || 0,
+        },
       },
       activities: activities.map((a, i) => ({
         initials: getInitials(a.user.name),

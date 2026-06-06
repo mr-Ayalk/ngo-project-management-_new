@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
+import { json, error, parseBody, requireAuth, requireAdmin } from '@/lib/api-utils';
 import { logAudit, getClientIp } from '@/lib/audit';
 
 export async function GET(req) {
@@ -19,7 +19,7 @@ export async function GET(req) {
 
 export async function PUT(req) {
   try {
-    const auth = await requireManager(req);
+    const auth = await requireAdmin(req);
     if (auth.error) return auth.error;
     const user = auth.user;
 

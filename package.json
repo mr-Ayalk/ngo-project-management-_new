@@ -7,7 +7,6 @@
     "dev": "next dev",
     "postinstall": "prisma generate",
     "build": "next build",
-    
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
@@ -20,14 +19,17 @@
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
+    "@uploadthing/react": "^7.3.3",
+    "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.0",
-    "react-chartjs-2": "^5.2.0",
     "jose": "^5.1.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
-    "axios": "^1.6.0"
+    "sonner": "^2.0.7",
+    "uploadthing": "^7.7.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

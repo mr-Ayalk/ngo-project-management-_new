@@ -306,3 +306,23 @@ model AuditLog {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 }
+
+model LogisticsShipment {
+  id            String    @id @default(cuid())
+  reference     String
+  description   String?
+  origin        String?
+  destination   String
+  carrier       String?
+  status        String    @default("pending")
+  priority      String    @default("normal")
+  items         String?
+  quantity      Int       @default(1)
+  expectedDate  DateTime?
+  deliveredDate DateTime?
+  notes         String?   @db.Text
+  projectId     String?
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
