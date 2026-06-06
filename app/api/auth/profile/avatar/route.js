@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import prisma from '@/lib/db';
 import { json, error, requireAuth } from '@/lib/api-utils';
 import { logAudit, getClientIp } from '@/lib/audit';

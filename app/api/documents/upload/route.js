@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { json, error, requireAuth } from '@/lib/api-utils';
+import { storeUploadedFile } from '@/lib/file-upload';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['pdf', 'xlsx', 'xls', 'docx', 'doc', 'csv', 'zip', 'png', 'jpg', 'jpeg'];
@@ -56,15 +55,10 @@ export async function POST(req) {
       return error(`File type not allowed. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`, 400);
     }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
-
-    const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(uploadDir, safeName), buffer);
+    const stored = await storeUploadedFile(file, { folder: 'uploads' });
 
     return json({
-      url: `/uploads/${safeName}`,
+      url: stored.url,
       name: file.name,
       size: formatSize(file.size),
       fileType: EXT_TYPES[ext] || ext.toUpperCase() || 'FILE',
@@ -72,6 +66,6 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error('Upload error:', err);
-    return error('Upload failed', 500);
+    return error(err.message || 'Upload failed', 500);
   }
 }
