@@ -1,237 +1,72 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-const PROGRAMS = [
-  {
-    title: 'Education and Quality',
-    desc: 'We improve equitable access to quality education by strengthening school infrastructure, enhancing teaching quality, providing learning materials, supporting vulnerable children, and promoting community engagement.',
-    gradient: 'program-gradient-education',
-    icon: '📚',
-  },
-  {
-    title: 'Health and Eye Care',
-    desc: 'Essential health services through facility construction, maternal and child health care, nutrition programs, and cataract and low-vision treatments for healthier communities.',
-    gradient: 'program-gradient-health',
-    icon: '🏥',
-  },
-  {
-    title: 'Water, Sanitation & Hygiene',
-    desc: 'Safe drinking water, sanitation facilities, hygiene promotion, and community-managed systems to reduce waterborne diseases and improve wellbeing.',
-    gradient: 'program-gradient-wash',
-    icon: '💧',
-  },
-  {
-    title: 'Women & Children Empowerment',
-    desc: 'Sustainable livelihoods, income-generating activities, and comprehensive support for orphans and vulnerable children with life skills and protection.',
-    gradient: 'program-gradient-women',
-    icon: '🤝',
-  },
-  {
-    title: 'Anti-Human Trafficking',
-    desc: 'Prevention through awareness, education, and safe migration, plus protection, recovery, and reintegration support for survivors.',
-    gradient: 'program-gradient-traffic',
-    icon: '🛡️',
-  },
-];
-
-const IMPACT_STATS = [
-  { value: 1.5, suffix: 'M+', label: 'Total beneficiaries served across Africa', decimals: 1 },
-  { value: 3929, suffix: '', label: 'Cataract and low vision surgeries provided', decimals: 0 },
-  { value: 5395, suffix: '+', label: 'Women supported with income generating activities', decimals: 0 },
-  { value: 700, suffix: 'K+', label: 'People reached with anti-trafficking awareness', decimals: 0 },
-  { value: 9, suffix: ' Systems', label: '5 shallow well pumps & 4 deep well water systems', decimals: 0 },
-  { value: 4747, suffix: '+', label: 'Orphans and vulnerable children supported', decimals: 0 },
-  { value: 71, suffix: ' Facilities', label: '47 schools and 24 health posts constructed', decimals: 0 },
-  { value: 9, suffix: ' Health Posts', label: '7 Maternal & Child Health facilities and 2 pharmacies', decimals: 0 },
-];
-
-const GOVERNMENT_PARTNERS = [
-  'Ministry of Finance',
-  'Ministry of Water and Energy',
-  'Ministry of Women and Children Affairs',
-  'Ministry of Justice',
-];
-
-function PartnerLogo({ type }) {
-  if (type === 'sunriders') {
-    return (
-      <span className="partner-text-logo" style={{ fontFamily: 'Georgia, serif', fontWeight: 900, fontSize: '2rem', color: '#1a1a2e' }}>
-        Sunriders
-      </span>
-    );
-  }
-  if (type === 'edward') {
-    return (
-      <span className="partner-text-logo" style={{ fontFamily: "'Trebuchet MS', sans-serif", fontWeight: 900, fontSize: '1.8rem', letterSpacing: '0.05em', color: '#0f3460', textTransform: 'uppercase' }}>
-        Edward Hsu
-      </span>
-    );
-  }
-  if (type === 'finote') {
-    return (
-      <div className="partner-text-logo text-center" style={{ fontFamily: 'Georgia, serif', fontWeight: 800, lineHeight: 1.25, color: '#1b1b2f', fontSize: '0.85rem', letterSpacing: '0.04em' }}>
-        <div>FINOTE TEHADSO</div>
-        <div>LEAKAL GUDATEGNA</div>
-        <div>SETOCH MAHIBER</div>
-      </div>
-    );
-  }
-  return (
-    <span className="partner-text-logo text-lg font-bold text-slate-700 whitespace-nowrap px-2">{type}</span>
-  );
-}
-
-const MARQUEE_PARTNERS = [
-  { type: 'The Stirling Foundation' },
-  { type: 'Forever Young Foundation' },
-  { type: 'LDS Charities' },
-  { type: 'sunriders' },
-  { type: 'Cure Blindness' },
-  { type: 'Thinking Schools International' },
-  { type: 'Chris and Shoko Trust' },
-  { type: 'edward' },
-  { type: 'finote' },
-];
-
-function useScrollProgress() {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const onScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-      const max = scrollHeight - clientHeight;
-      setProgress(max > 0 ? (scrollTop / max) * 100 : 0);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  return progress;
-}
-
-function useInView(threshold = 0.15) {
-  const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
-      { threshold }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, visible];
-}
-
-function AnimatedStat({ stat, active }) {
-  const [display, setDisplay] = useState('0');
-
-  useEffect(() => {
-    if (!active) return;
-    const duration = 1800;
-    const start = performance.now();
-    const target = stat.value;
-
-    const tick = (now) => {
-      const t = Math.min((now - start) / duration, 1);
-      const eased = 1 - (1 - t) ** 3;
-      const current = target * eased;
-      if (stat.decimals > 0) {
-        setDisplay(current.toFixed(stat.decimals));
-      } else {
-        setDisplay(Math.floor(current).toLocaleString());
-      }
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [active, stat]);
-
-  return (
-    <>
-      {display}
-      {stat.suffix}
-    </>
-  );
-}
-
-function Reveal({ children, className = '', delay = 0 }) {
-  const [ref, visible] = useInView(0.12);
-  return (
-    <div
-      ref={ref}
-      className={`reveal ${visible ? 'reveal-visible' : ''} ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function LandingPage() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const scrollProgress = useScrollProgress();
-  const [impactRef, impactVisible] = useInView(0.2);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const goLogin = useCallback(() => router.push('/login'), [router]);
+  const goLogin = () => router.push('/login');
 
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setMobileOpen(false);
   };
 
-  const navLinks = [
-    ['Home', 'hero'],
-    ['About', 'about'],
-    ['Programs', 'programs'],
-    ['Impact', 'impact'],
-    ['Partners', 'partners'],
-    ['Contact', 'contact-footer'],
-  ];
-
   return (
-    <div id="landing-root" className="min-h-screen bg-white text-slate-900 font-sans antialiased overflow-x-hidden">
-      {/* Scroll progress */}
-      <div className="scroll-progress" style={{ width: `${scrollProgress}%` }} aria-hidden />
+    <div
+      id="landing-root"
+      className="min-h-screen text-slate-900 bg-white font-sans"
+      style={{ backgroundColor: '#ffffff' }}
+    >
+      {/* Nav */}
+      <header className="fixed top-0 left-0 right-0 z-30 bg-white shadow-sm border-b border-slate-100">
+        <div className="max-w-[1400px] mx-auto px-6 h-24 flex items-center justify-between">
+          <div className="flex items-center">
+            <img
+              src="/engage.jpg"
+              alt="ENA"
+              className="h-20 md:h-24 w-auto object-contain cursor-pointer"
+              onClick={() => scrollTo('hero')}
+            />
+          </div>
 
-      {/* Navigation */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'nav-scrolled' : 'bg-white/70 backdrop-blur-lg border-b border-white/50'}`}>
-        <div className="max-w-[1400px] mx-auto px-6 h-20 md:h-24 flex items-center justify-between">
-          <button type="button" onClick={() => scrollTo('hero')} className="flex items-center gap-3 group">
-            <img src="/engage.svg" alt="Engage Now Africa" className="h-14 md:h-16 w-auto object-contain transition-transform group-hover:scale-105" />
-            <span className="hidden sm:block text-sm font-bold text-slate-800 tracking-tight">Engage Now Africa</span>
-          </button>
-
-          <nav className="hidden lg:flex items-center gap-8 text-[15px] font-semibold text-slate-700">
-            {navLinks.map(([label, id]) => (
-              <button key={id} type="button" onClick={() => scrollTo(id)} className="nav-link hover:text-[#1273de] transition-colors">
+          <nav className="hidden md:flex items-center gap-8 text-base font-semibold text-slate-900">
+            {[
+              ['Home', 'hero'],
+              ['About', 'about'],
+              ['Programs', 'programs'],
+              ['Impact', 'impact'],
+              ['Contact', 'contact-footer'],
+            ].map(([label, id]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => scrollTo(id)}
+                className="hover:text-[#1273de] transition"
+              >
                 {label}
               </button>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <button type="button" onClick={goLogin} className="text-[15px] font-semibold text-slate-600 hover:text-[#1273de] px-4 py-2 transition">
-              Sign In
-            </button>
-            <button type="button" onClick={goLogin} className="ui-button-primary text-[15px] px-7 py-3">
-              Get Started →
+          <div className="hidden md:block">
+            <button type="button" onClick={goLogin} className="ui-button-primary text-base px-6 py-2.5">
+              Get Started
             </button>
           </div>
 
-          <div className="md:hidden flex items-center gap-2">
-            <button type="button" onClick={goLogin} className="ui-button-primary text-sm px-4 py-2">Start</button>
-            <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-slate-800" aria-label="Menu">
+          <div className="md:hidden flex items-center gap-4">
+            <button type="button" onClick={goLogin} className="ui-button-primary text-sm px-4 py-2">
+              Get Started
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="text-slate-900 hover:text-[#1273de] focus:outline-none"
+              aria-label="Toggle Menu"
+            >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -244,85 +79,78 @@ export default function LandingPage() {
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-6 py-5 space-y-1 shadow-xl animate-fade-up">
-            {navLinks.map(([label, id]) => (
-              <button key={id} type="button" onClick={() => scrollTo(id)} className="block w-full text-left py-3 text-base font-semibold text-slate-800 hover:text-[#1273de] border-b border-slate-50 last:border-0">
+          <div className="md:hidden bg-white border-t border-slate-100 px-6 py-4 space-y-3 shadow-inner">
+            {[
+              ['Home', 'hero'],
+              ['About', 'about'],
+              ['Programs', 'programs'],
+              ['Impact', 'impact'],
+              ['Contact', 'contact-footer'],
+            ].map(([label, id]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => scrollTo(id)}
+                className="block w-full text-left py-2 text-base font-semibold text-slate-900 hover:text-[#1273de]"
+              >
                 {label}
               </button>
             ))}
-            <button type="button" onClick={goLogin} className="ui-button-primary w-full mt-4 py-3">Get Started</button>
           </div>
         )}
       </header>
 
       {/* Hero */}
-      <section id="hero" className="relative min-h-screen pt-28 pb-20 hero-gradient flex items-center overflow-hidden">
-        <div className="hero-grid absolute inset-0 pointer-events-none" aria-hidden />
-        <div className="glow-orb w-[28rem] h-[28rem] bg-[#1273de]/25 -top-32 -left-32 animate-pulse-glow" />
-        <div className="glow-orb w-80 h-80 bg-teal-400/20 top-40 right-0 animate-pulse-glow" style={{ animationDelay: '1.5s' }} />
-        <div className="glow-orb w-64 h-64 bg-indigo-400/15 bottom-20 left-1/3 animate-pulse-glow" style={{ animationDelay: '0.8s' }} />
-
+      <section
+        id="hero"
+        className="min-h-screen pt-28 pb-16 relative bg-white overflow-hidden flex items-center"
+      >
         <div
-          className="animated-map absolute inset-0 pointer-events-none"
+          className="animated-map absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{
             backgroundImage: 'url(/brand/world-map.svg)',
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',
-            backgroundSize: '70%',
+            backgroundSize: '60%',
           }}
         />
-
-        <div className="max-w-[1400px] mx-auto px-6 w-full relative z-10">
-          <div className="grid lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-7">
-              <div className="hero-badge mb-6 animate-fade-up">
-                <span className="w-2 h-2 rounded-full bg-[#1273de] animate-pulse" />
-                Heal · Rescue · Lift — Since 2002
-              </div>
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.08] font-extrabold text-slate-900 tracking-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
-                Empowering Communities.
-                <span className="block mt-2 bg-gradient-to-r from-[#1273de] via-teal-500 to-[#6366f1] bg-clip-text text-transparent hero-shimmer">
+        <div className="w-full relative z-10">
+          <div className="max-w-[1400px] mx-auto px-6 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-7">
+                <h1 className="text-5xl md:text-6xl leading-tight font-extrabold text-slate-900">
+                  Empowering Communities.
+                  <br />
                   Creating Lasting Change.
-                </span>
-              </h1>
-              <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                Sustainable development, education, healthcare, clean water, and economic opportunities — restoring hope and dignity across Ethiopia, Ghana, Namibia, and Sierra Leone.
-              </p>
-              <div className="mt-10 flex flex-wrap gap-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-                <button type="button" onClick={() => scrollTo('about')} className="ui-button-primary px-8 py-4 text-base">
-                  Learn More
-                </button>
-                <button type="button" onClick={goLogin} className="ui-button-outline px-8 py-4 text-base">
-                  Get Started
-                </button>
-              </div>
-              <div className="mt-12 flex flex-wrap gap-8 text-sm text-slate-500 font-medium animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                {[
-                  ['4', 'Countries'],
-                  ['1.5M+', 'Lives Touched'],
-                  ['20+', 'Years of Impact'],
-                ].map(([num, label]) => (
-                  <div key={label} className="hero-stat-pill">
-                    <span className="block text-2xl font-extrabold text-[#1273de]">{num}</span>
-                    {label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 hidden lg:flex justify-center relative">
-              <div className="relative w-full max-w-lg">
-                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#1273de]/30 to-teal-400/25 blur-3xl scale-110 animate-pulse-glow" />
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-blue-500/25 border border-white/90 bg-white/80 backdrop-blur-sm p-4 collage-image">
-                  <img src="/africa-collage.svg" alt="Africa communities collage" className="w-full h-auto object-contain rounded-2xl" />
-                  <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-slate-100 shadow-lg">
-                    <p className="text-sm font-bold text-slate-800">ENA Project Management Platform</p>
-                    <p className="text-xs text-slate-500 mt-1">Track impact · Manage programs · Report outcomes</p>
-                  </div>
+                </h1>
+                <p className="mt-6 text-xl md:text-2xl text-slate-700 max-w-2xl leading-relaxed">
+                  Sustainable development, education, healthcare, clean water,
+                  and economic opportunities across Africa.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <button
+                    type="button"
+                    onClick={() => scrollTo('about')}
+                    className="inline-flex items-center justify-center rounded-full bg-[#1273de] text-white px-8 py-3.5 text-base font-semibold shadow-md hover:bg-[#0f63c3] transition"
+                  >
+                    Learn More
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goLogin}
+                    className="inline-flex items-center justify-center rounded-full border-2 border-[#1273de] text-[#1273de] px-8 py-3.5 text-base font-semibold hover:bg-[#1273de] hover:text-white transition"
+                  >
+                    Get Started
+                  </button>
                 </div>
-                <div className="floating-chip floating-chip-1">Education</div>
-                <div className="floating-chip floating-chip-2">Clean Water</div>
-                <div className="floating-chip floating-chip-3">Healthcare</div>
+              </div>
+
+              <div className="lg:col-span-5 hidden lg:flex items-center justify-end pr-8 bg-transparent">
+                <img
+                  src="/africa-collage.png"
+                  alt="Africa collage"
+                  className="collage-image w-[600px] max-w-full h-auto object-contain"
+                />
               </div>
             </div>
           </div>
@@ -330,214 +158,325 @@ export default function LandingPage() {
       </section>
 
       {/* About */}
-      <section id="about" className="py-24 md:py-32 bg-white relative section-with-bg">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
-            <Reveal className="lg:sticky lg:top-28">
-              <p className="text-[#1273de] font-bold uppercase tracking-widest text-sm mb-4">About Us</p>
-              <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 leading-tight">Who We Are</h2>
-              <p className="text-lg text-slate-600 leading-relaxed">
-                Engage Now Africa (ENA) is an international NGO founded in 2002, committed to restoring hope and dignity to vulnerable communities across Africa. Through integrated programs in education, health, clean water, livelihoods, OVC support, and anti-human trafficking, ENA works to lift, heal and rescue lives. Today, ENA serves communities in Ethiopia, Ghana, Namibia, and Sierra Leone, creating lasting change together with local partners.
+      <section
+        id="about"
+        className="section-with-bg min-h-screen pt-32 pb-16 text-slate-900 bg-white relative"
+      >
+        <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start mb-16">
+            <div className="space-y-6 lg:sticky lg:top-32">
+              <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6">
+                Who We Are
+              </h2>
+              <p className="text-xl text-slate-700 leading-relaxed font-medium">
+                Engage Now Africa (ENA) is an international NGO founded in 2002,
+                committed to restoring hope and dignity to vulnerable
+                communities across Africa. Through integrated programs in
+                education, health, clean water, livelihoods, OVC support, and
+                anti-human trafficking, ENA works to lift, heal and rescue
+                lives. Today, ENA serves communities in Ethiopia, Ghana,
+                Namibia, and Sierra Leone, creating lasting change together with
+                local partners.
               </p>
-            </Reveal>
+            </div>
 
-            <Reveal delay={120}>
-              <div className="bg-white border border-slate-200 rounded-3xl shadow-xl shadow-slate-200/50 p-8 md:p-10 space-y-8 about-card-glow">
-                {[
-                  ['Mission', 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', "ENA's mission is to heal, rescue, and lift our brothers and sisters in Africa. Our purpose is to provide resources and training to vulnerable populations, enabling them to become self-reliant through clean water, sanitation, health, education, micro-credit, and income-generating activities."],
-                  ['Vision', 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z', 'Envisioning a world free of poverty with happy, self-reliant communities made of virtuous individuals and families.'],
-                  ['Our Theory of Change', 'M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.656 48.656 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3M3 12c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M3 12l-3 3m3-3 3 3', 'We design projects focused on individuals and families vulnerable to poverty, mobilizing local assets with global partners, government ministers, and tribal leaders to align projects with community needs.'],
-                ].map(([title, iconPath, text], i) => (
-                  <div key={title}>
-                    {i > 0 && <div className="section-divider mb-8" />}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#1273de]/10 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-[#1273de]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                          <path strokeLinecap="round" strokeLinejoin="round" d={iconPath} />
-                        </svg>
-                      </div>
-                      <h3 className="text-xl font-extrabold text-slate-900">{title}</h3>
-                    </div>
-                    <p className="text-slate-600 leading-relaxed pl-[52px]">{text}</p>
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-lg p-6 md:p-8 w-full flex flex-col gap-8">
+              {[
+                {
+                  title: 'Mission',
+                  icon: 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+                  text: "ENA's mission is to heal, rescue, and lift our brothers and sisters in Africa. Our purpose is to provide resources and training to vulnerable populations, enabling them to become self-reliant and substantially improve their lives. We accomplish our mission by developing greater capacity in the individuals and communities we serve. We focus on the fundamental building blocks that lead to individual self-reliance, including clean water, sanitation, health, education, micro-credit, and other income-generating activities that strengthen families and build communities.",
+                },
+                {
+                  title: 'Vision',
+                  icon: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+                  text: 'Envisioning a world free of poverty with happy, self-reliant community made of virtuous individuals and families.',
+                },
+                {
+                  title: 'Our Theory of Change',
+                  icon: 'M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.656 48.656 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3M3 12c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M3 12l-3 3m3-3 3 3M9 5.25c.34-.144.698-.244 1.072-.292a48.293 48.293 0 0 1 3.856 0c.374.048.733.148 1.072.292M9 18.75c.34.144.698.244 1.072.292a48.293 48.293 0 0 0 3.856 0c.374-.048.733-.148 1.072-.292M12 9.75v4.5m0-4.5h.008v.008H12V9.75Z',
+                  text: 'Our theory of change is based on a multi-faceted approach. We design projects and programs focused on addressing the needs of individuals and families vulnerable to poverty, aiming to empower recipients to become self-reliant. We mobilize local assets in collaboration with global partners, government ministers, and tribal leaders to align projects with community needs.',
+                },
+              ].map((block, i) => (
+                <div key={block.title} className="px-2">
+                  {i > 0 && <div className="h-px w-full bg-slate-100 mb-8" />}
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-[#1273de]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={block.icon} />
+                    </svg>
+                    <h3 className="text-2xl font-extrabold text-slate-900">{block.title}</h3>
                   </div>
-                ))}
-              </div>
-            </Reveal>
+                  <p className="text-slate-600 text-base md:text-lg leading-relaxed font-normal">{block.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Programs */}
-      <section id="programs" className="py-24 bg-slate-50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(18,115,222,0.06),transparent_50%)] pointer-events-none" />
-        <div className="max-w-[1400px] mx-auto px-6 relative z-10">
-          <Reveal>
-            <p className="text-[#1273de] font-bold uppercase tracking-widest text-sm mb-3">What We Do</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-14">Program Focus Areas</h2>
-          </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {PROGRAMS.map((p, i) => (
-              <Reveal key={p.title} delay={i * 80}>
-                <article className="interactive-card bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-[#1273de]/40 hover:shadow-2xl hover:shadow-blue-500/10 flex flex-col group h-full">
-                  <div className={`h-48 ${p.gradient} flex items-center justify-center relative overflow-hidden`}>
-                    <span className="text-7xl drop-shadow-lg group-hover:scale-125 transition-transform duration-500">{p.icon}</span>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                  <div className="p-6 flex-1">
-                    <h4 className="font-extrabold text-slate-900 text-xl group-hover:text-[#1273de] transition-colors">{p.title}</h4>
-                    <p className="text-slate-600 mt-3 leading-relaxed text-[15px]">{p.desc}</p>
-                  </div>
-                </article>
-              </Reveal>
-            ))}
-          </div>
+      <section id="programs" className="section-with-bg max-w-[1400px] mx-auto px-6 py-16 relative">
+        <div className="mb-12 text-left">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 relative z-10">
+            Program Focus Areas
+          </h2>
+        </div>
+        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
+          {[
+            ['Education and Quality', 'We improve equitable access to quality education by strengthening school infrastructure, enhancing teaching quality, providing learning materials, supporting vulnerable children, and promoting community engagement to improve attendance and retention.', '/programs/education.jpg'],
+            ['Health and Eye Care', 'We enhance access to essential health services through health facility construction, maternal and child health care, Early Childhood nutrition, community health awareness, and cataract and low-vision treatments to improve overall community health outcomes.', '/programs/health.jpeg'],
+            ['Water, Sanitation, and Hygiene (WASH)', 'We work to improve access to safe drinking water, improve sanitation facilities, promote hygiene practices, and strengthen community management systems to reduce waterborne diseases and improve wellbeing.', '/programs/water.webp'],
+            ['Women & Children Empowerment', 'We promote sustainable livelihoods, income-generating activities, and comprehensive support for orphans and vulnerable children, while strengthening life skills, leadership, and protection mechanisms.', '/programs/women.jpg'],
+            ['Anti-Human Trafficking', 'We prevent human trafficking through awareness, education, and safe migration, while providing protection, recovery, and reintegration support for survivors.', '/programs/anti-traffic.png'],
+          ].map((p) => (
+            <div
+              key={p[0]}
+              className="interactive-card bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-xl hover:border-[#1273de] transition-all duration-300 flex flex-col"
+            >
+              <div className="w-full h-52 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                <img
+                  src={p[2]}
+                  alt={p[0]}
+                  className="w-full h-full object-cover absolute inset-0"
+                  onError={(e) => { e.currentTarget.style.opacity = '0'; }}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(18,115,222,0.06),rgba(15,99,195,0.03))] flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-[#1273de]/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="p-6 flex-1 flex flex-col justify-between bg-white border-t border-slate-100">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xl hover:text-[#1273de] transition-colors">{p[0]}</h4>
+                  <p className="text-base text-slate-600 mt-2 leading-relaxed font-normal">{p[1]}</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Impact */}
-      <section id="impact" ref={impactRef} className="py-24 bg-white relative">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <Reveal>
-            <p className="text-[#1273de] font-bold uppercase tracking-widest text-sm mb-3">Measurable Change</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-14">Our Impact</h2>
-          </Reveal>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {IMPACT_STATS.map((stat, i) => (
-              <Reveal key={stat.label} delay={i * 60}>
-                <div className="stat-card interactive-card ui-panel p-7 text-center relative">
-                  <div className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-[#1273de] to-teal-600 bg-clip-text text-transparent">
-                    <AnimatedStat stat={stat} active={impactVisible} />
-                  </div>
-                  <p className="text-[15px] text-slate-600 mt-3 font-medium leading-snug">{stat.label}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+      <section id="impact" className="section-with-bg max-w-[1400px] mx-auto px-6 py-16 bg-white relative">
+        <div className="mb-12">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 relative z-10">
+            Our Impact
+          </h2>
+        </div>
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+          {[
+            ['1.5 Million+', 'Total Beneficiaries served across Africa'],
+            ['3,929', 'Cataract and low vision surgeries provided'],
+            ['5,395+', 'Women supported with alternative income generating activities'],
+            ['700k+', 'People reached with anti-human trafficking awareness and prevention'],
+            ['9 Systems', '5 shallow well pumps & 4 deep well water systems developed'],
+            ['4,747+', 'Orphans and vulnerable children supported'],
+            ['71 Facilities', '47 schools and 24 health posts constructed'],
+            ['9 Health Posts', '7 Maternal & Child Health facilities and 2 pharmacies built'],
+          ].map((stat) => (
+            <div
+              key={stat[0]}
+              className="interactive-card ui-panel p-6 text-center cursor-pointer hover:shadow-lg hover:border-[#1273de] transition-all duration-300"
+            >
+              <div className="text-4xl font-extrabold text-[#1273de]">{stat[0]}</div>
+              <div className="text-base text-slate-600 mt-2 font-medium">{stat[1]}</div>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Partners */}
-      <section id="partners" className="py-24 bg-slate-50 overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <Reveal>
-            <p className="text-[#1273de] font-bold uppercase tracking-widest text-sm mb-3">Collaboration</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-12">Partners</h2>
-          </Reveal>
+      <section id="partners" className="section-with-bg max-w-[1400px] mx-auto px-6 py-16 bg-white relative overflow-hidden">
+        <div className="mb-14 relative z-10">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-10">Partners</h2>
+          <h3 className="text-2xl font-bold text-[#1273de] uppercase tracking-widest mb-6">
+            Government Partners
+          </h3>
+          <div className="flex flex-col gap-0 max-w-lg">
+            {[
+              'Ministry of Finance',
+              'Ministry of Water and Energy',
+              'Ministry of Women and Children Affairs',
+              'Ministry of Justice',
+            ].map((ministry) => (
+              <div key={ministry} className="flex items-stretch group">
+                <div className="w-0.5 bg-slate-200 group-hover:bg-[#1273de] transition-colors duration-300 mr-5 flex-shrink-0" />
+                <div className="py-4 flex-1 border-b border-slate-100 last:border-b-0">
+                  <p className="text-lg font-semibold text-slate-800 group-hover:text-[#1273de] transition-colors duration-300">
+                    {ministry}
+                  </p>
+                  <p className="text-sm text-slate-400 mt-0.5">At Regional Levels</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          <Reveal delay={80}>
-            <h3 className="text-lg font-bold text-[#1273de] uppercase tracking-widest mb-6">Government Partners</h3>
-            <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mb-16">
-              {GOVERNMENT_PARTNERS.map((name) => (
-                <div key={name} className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:border-[#1273de]/30 hover:shadow-md transition-all group">
-                  <div className="w-1 h-10 bg-slate-200 group-hover:bg-[#1273de] rounded-full transition-colors" />
-                  <div>
-                    <p className="font-semibold text-slate-800 group-hover:text-[#1273de] transition-colors">{name}</p>
-                    <p className="text-sm text-slate-400">At Regional Levels</p>
+        <div className="relative z-10">
+          <h3 className="text-2xl font-bold text-[#1273de] uppercase tracking-widest mb-8">
+            Our Partners
+          </h3>
+          <div
+            className="relative overflow-hidden py-4"
+            style={{
+              maskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
+            }}
+          >
+            <div className="marquee-track flex items-center gap-12 w-max">
+              {[0, 1].map((pass) => (
+                <div key={pass} className="flex items-center gap-16">
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/stirling-foundation.jpg" alt="The Stirling Foundation" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/forever-young.jpeg" alt="Forever Young Foundation" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/lds-church.png" alt="The Church of Jesus Christ of Latter-day Saints" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <span style={{ fontFamily: 'Georgia, serif', fontWeight: 900, fontSize: '2.5rem', letterSpacing: '-0.02em', color: '#1a1a2e', textShadow: '1px 1px 0 rgba(0,0,0,0.08)' }}>
+                      Sunriders
+                    </span>
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/cure-blindness.png" alt="Cure Blindness" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/thinking-schools.jpg" alt="Thinking Schools International" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <img src="/partners/chris-shoko-trust.png" alt="Chris and Shoko Trust" className="h-24 w-auto object-contain" />
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <span style={{ fontFamily: "'Trebuchet MS', sans-serif", fontWeight: 900, fontSize: '2.2rem', letterSpacing: '0.05em', color: '#0f3460', textTransform: 'uppercase' }}>
+                      Edward Hsu
+                    </span>
+                  </div>
+                  <div className="flex-shrink-0 h-28 flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity">
+                    <div style={{ fontFamily: 'Georgia, serif', fontWeight: 800, lineHeight: 1.25, color: '#1b1b2f', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.1rem', letterSpacing: '0.04em' }}>FINOTE TEHADSO</div>
+                      <div style={{ fontSize: '1.1rem', letterSpacing: '0.04em' }}>LEAKAL GUDATEGNA</div>
+                      <div style={{ fontSize: '1.1rem', letterSpacing: '0.04em' }}>SETOCH MAHIBER</div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </Reveal>
-
-          <Reveal delay={120}>
-            <h3 className="text-lg font-bold text-[#1273de] uppercase tracking-widest mb-8">Our Partners</h3>
-            <div
-              className="relative overflow-hidden py-6 partner-marquee-wrap"
-              style={{
-                maskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
-              }}
-            >
-              <div className="marquee-track flex items-center gap-12 w-max">
-                {[0, 1].map((pass) => (
-                  <div key={pass} className="flex items-center gap-16 px-4">
-                    {MARQUEE_PARTNERS.map((partner) => (
-                      <div key={`${pass}-${partner.type}`} className="flex-shrink-0 h-28 min-w-[180px] px-6 flex items-center justify-center bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-[#1273de]/30 transition-all opacity-90 hover:opacity-100">
-                        <PartnerLogo type={partner.type} />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-24 cta-aurora relative overflow-hidden">
-        <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'url(/brand/world-map.svg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-        <div className="max-w-[1400px] mx-auto px-6 text-center relative z-10">
-          <Reveal>
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4">Ready to manage your impact?</h2>
-            <p className="text-white/85 text-lg max-w-2xl mx-auto mb-10">
-              Access the ENA Project Management workspace — track projects, budgets, beneficiaries, and team collaboration in one secure platform.
-            </p>
-            <button type="button" onClick={goLogin} className="cta-button inline-flex items-center gap-2 bg-white text-[#1273de] px-10 py-4 rounded-full font-bold text-lg shadow-2xl">
-              Get Started →
-            </button>
-          </Reveal>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer id="contact-footer" className="bg-gradient-to-br from-[#0a3a8c] via-[#1157c9] to-[#1e6fe0] text-white">
-        <div className="h-1 w-full bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+      <footer
+        id="contact-footer"
+        className="mt-0 bg-[linear-gradient(135deg,#0a3a8c_0%,#1157c9_50%,#1e6fe0_100%)] text-white"
+      >
+        <div className="h-1 w-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)]" />
         <div className="max-w-[1400px] mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-            <div>
-              <img src="/logo.svg" alt="Engage Now Africa" className="h-16 w-auto object-contain mb-4 brightness-0 invert" />
-              <p className="text-white/80 leading-relaxed text-[15px]">
-                Restoring hope and dignity to vulnerable communities across Africa — through education, health, clean water, and self-reliance.
+            <div className="flex flex-col gap-4">
+              <img src="/logo.jpg" alt="Engage Now Africa" className="h-20 w-auto object-contain rounded-lg" />
+              <p className="text-base text-white/80 leading-relaxed mt-1 font-normal">
+                Restoring hope and dignity to vulnerable communities across
+                Africa — through education, health, clean water, and
+                self-reliance.
               </p>
-              <p className="text-sm text-white/50 mt-3 font-semibold uppercase tracking-wider">Heal · Rescue · Lift</p>
+              <p className="text-sm text-white/50 mt-1 font-medium tracking-wide uppercase">
+                Heal · Rescue · Lift
+              </p>
             </div>
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest text-white/60 mb-4">Quick Links</h4>
-              <ul className="space-y-3">
-                {[['About', 'about'], ['Program Focus Areas', 'programs'], ['Our Impact', 'impact'], ['Partners', 'partners']].map(([label, id]) => (
+
+            <div className="flex flex-col gap-4">
+              <h4 className="text-base font-bold uppercase tracking-widest text-white/60">Quick Links</h4>
+              <ul className="flex flex-col gap-3">
+                {[
+                  ['About', 'about'],
+                  ['Program Focus Areas', 'programs'],
+                  ['Our Impact', 'impact'],
+                  ['Partners', 'partners'],
+                ].map(([label, id]) => (
                   <li key={id}>
-                    <button type="button" onClick={() => scrollTo(id)} className="text-white/80 hover:text-white hover:pl-1 transition-all flex items-center gap-2 group text-[15px]">
-                      <span className="w-4 h-px bg-white/30 group-hover:w-6 group-hover:bg-white transition-all" />
+                    <button
+                      type="button"
+                      onClick={() => scrollTo(id)}
+                      className="text-base text-white/80 hover:text-white hover:pl-1 transition-all duration-200 flex items-center gap-2 group"
+                    >
+                      <span className="block w-4 h-px bg-white/30 group-hover:w-6 group-hover:bg-white transition-all duration-200" />
                       {label}
                     </button>
                   </li>
                 ))}
               </ul>
             </div>
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest text-white/60 mb-4">Contact</h4>
-              <div className="space-y-3 text-[15px] text-white/80">
-                <p>Oromia, Bishoftu City<br />Kebele 02, House no.134<br />P.O.Box: 1607</p>
-                <p>0114372727</p>
-                <p>engagenowafrica.tenkir@gmail.com</p>
-                <p>www.engagenowafrica.org</p>
+
+            <div className="flex flex-col gap-4">
+              <h4 className="text-base font-bold uppercase tracking-widest text-white/60">Contact</h4>
+              <div className="flex flex-col gap-3 text-base text-white/80">
+                <div className="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mt-0.5 flex-shrink-0 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                  </svg>
+                  <span>
+                    Oromia, Bishoftu City
+                    <br />
+                    Kebele 02, House no.134
+                    <br />
+                    P.O.Box: 1607
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+                  </svg>
+                  <span>0114372727</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                  <span>
+                    engagenowafrica.tenkir
+                    <br />
+                    @gmail.com
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253" />
+                  </svg>
+                  <span>www.engagenowafrica.org</span>
+                </div>
               </div>
             </div>
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest text-white/60 mb-4">Follow Us</h4>
-              <div className="flex flex-col gap-3 mb-6">
+
+            <div className="flex flex-col gap-4">
+              <h4 className="text-base font-bold uppercase tracking-widest text-white/60">Follow Us</h4>
+              <div className="flex flex-col gap-3">
                 {[
                   { label: 'Facebook', letter: 'f' },
                   { label: 'Twitter / X', letter: '𝕏' },
                   { label: 'Instagram', letter: 'ig' },
                 ].map(({ label, letter }) => (
                   <a key={label} href="#" className="flex items-center gap-3 group">
-                    <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sm font-bold group-hover:bg-white/20 group-hover:border-white/40 transition-all">
+                    <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sm font-bold group-hover:bg-white/20 group-hover:border-white/40 transition-all duration-200">
                       {letter}
                     </div>
-                    <span className="text-base text-white/70 group-hover:text-white transition-colors">{label}</span>
+                    <span className="text-base text-white/70 group-hover:text-white transition-colors duration-200">
+                      {label}
+                    </span>
                   </a>
                 ))}
               </div>
-              <button type="button" onClick={goLogin} className="ui-button-primary bg-white text-[#1273de] hover:bg-slate-100 shadow-none px-6 py-3 w-full sm:w-auto">
-                Sign In to Platform
-              </button>
             </div>
           </div>
         </div>
+
         <div className="border-t border-white/10">
-          <div className="max-w-[1400px] mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between gap-2 text-sm text-white/50">
+          <div className="max-w-[1400px] mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-white/50">
             <span>© {new Date().getFullYear()} Engage Now Africa. All rights reserved.</span>
             <span>Oromia, Ethiopia · West Africa · Southern Africa</span>
           </div>
