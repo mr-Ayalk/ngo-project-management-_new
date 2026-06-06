@@ -32,7 +32,9 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.payment.deleteMany();
+  await prisma.taskDeliverable.deleteMany();
   await prisma.taskComment.deleteMany();
+  await prisma.logisticsShipment.deleteMany();
   await prisma.pinnedProject.deleteMany();
   await prisma.projectMember.deleteMany();
   await prisma.message.deleteMany();
