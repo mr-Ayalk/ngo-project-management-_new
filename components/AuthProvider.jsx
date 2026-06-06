@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function loadUser() {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token')?.trim() : null;
 
       if (!token) {
         setLoading(false);
@@ -35,7 +35,10 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await api.login(email, password);
-    localStorage.setItem('token', data.token);
+    if (!data?.token) {
+      throw new Error('Login failed — no token received');
+    }
+    localStorage.setItem('token', data.token.trim());
     setUser(data.user);
     return data.user;
   };

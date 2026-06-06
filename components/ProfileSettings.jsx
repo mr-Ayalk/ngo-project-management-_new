@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import toast from '@/lib/toast';
-import { UploadButton } from '@/lib/uploadthing';
 import UserAvatar from '@/components/UserAvatar';
 import { PROFILE_EMOJIS } from '@/lib/avatar';
 import { useAuth } from '@/components/AuthProvider';
@@ -13,11 +12,13 @@ export default function ProfileSettings() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [name, setName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState(null);
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     async function load() {
@@ -37,9 +38,30 @@ export default function ProfileSettings() {
     load();
   }, []);
 
-  const getUploadHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error('Image must be 4 MB or smaller');
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const data = await api.uploadProfileAvatar(file);
+      setProfile(data.user);
+      setSelectedEmoji(null);
+      await refreshUser?.();
+      toast.success('Profile photo updated');
+    } catch (err) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
   };
 
   const handleSaveProfile = async (e) => {
@@ -117,23 +139,22 @@ export default function ProfileSettings() {
               <input value={displayUser?.email || ''} disabled readOnly />
             </div>
             <div className="profile-upload-row">
-              <UploadButton
-                endpoint="profileImage"
-                headers={getUploadHeaders()}
-                onClientUploadComplete={async () => {
-                  await refreshUser?.();
-                  const data = await api.profile();
-                  setProfile(data.user);
-                  setSelectedEmoji(null);
-                  toast.success('Photo uploaded');
-                }}
-                onUploadError={(err) => toast.error(err.message || 'Upload failed')}
-                appearance={{
-                  button: 'btn-secondary profile-upload-btn',
-                  allowedContent: 'hidden',
-                }}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="profile-photo-input"
+                onChange={handlePhotoSelect}
               />
-              <span className="profile-upload-hint">JPG, PNG up to 4MB</span>
+              <button
+                type="button"
+                className="btn-secondary profile-upload-btn"
+                disabled={uploadingPhoto}
+                onClick={() => photoInputRef.current?.click()}
+              >
+                {uploadingPhoto ? 'Uploading…' : 'Upload Photo'}
+              </button>
+              <span className="profile-upload-hint">JPG, PNG, WebP up to 4MB</span>
             </div>
           </div>
         </div>

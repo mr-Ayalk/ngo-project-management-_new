@@ -1,61 +1,44 @@
 import { NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { verifyJWT, extractBearerToken } from '@/lib/jwt';
 
-const PUBLIC_API = ['/api/auth/login'];
-const PUBLIC_PAGES = ['/', '/login'];
+const PUBLIC_API_PREFIXES = ['/api/auth/login', '/api/auth/signup'];
+const SELF_AUTH_API_PREFIXES = ['/api/uploadthing'];
 
-function getSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') return null;
-    return new TextEncoder().encode('dev-only-secret-not-for-production');
-  }
-  return new TextEncoder().encode(secret);
+function isPublicApi(pathname) {
+  return PUBLIC_API_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-async function verifyToken(token) {
-  const secret = getSecret();
-  if (!secret) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    return payload;
-  } catch {
-    return null;
-  }
+function isSelfAuthApi(pathname) {
+  return SELF_AUTH_API_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith('/api/')) {
-    if (PUBLIC_API.some((p) => pathname === p)) {
-      return NextResponse.next();
-    }
-
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await verifyToken(token);
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-    }
-
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-id', user.id);
-    requestHeaders.set('x-user-role', user.role);
-
-    return NextResponse.next({ request: { headers: requestHeaders } });
-  }
-
-  if (PUBLIC_PAGES.includes(pathname)) {
+  if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 
-  return NextResponse.next();
+  if (isPublicApi(pathname) || isSelfAuthApi(pathname)) {
+    return NextResponse.next();
+  }
+
+  const token = extractBearerToken(request);
+
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const user = await verifyJWT(token);
+  if (!user) {
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-user-id', String(user.id));
+  requestHeaders.set('x-user-role', String(user.role));
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
