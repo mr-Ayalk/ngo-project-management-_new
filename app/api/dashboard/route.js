@@ -14,7 +14,7 @@ export async function GET(req) {
     const sixtyDaysAgo = new Date(now);
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-    const [projects, org, activities, completedLast30, completedPrev30] = await Promise.all([
+    const [projects, org, activities, completedLast30, completedPrev30, todoCount, inProgressCount, completedCount] = await Promise.all([
       prisma.project.findMany({
         select: {
           status: true, budget: true, spent: true, progress: true,
@@ -36,6 +36,9 @@ export async function GET(req) {
           updatedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
         },
       }),
+      prisma.task.count({ where: { status: 'todo' } }),
+      prisma.task.count({ where: { status: 'in_progress' } }),
+      prisma.task.count({ where: { status: 'completed' } }),
     ]);
 
     const activeProjects = projects.filter((p) => p.status !== 'completed').length;
@@ -173,10 +176,18 @@ export async function GET(req) {
         newTasks: chartNewTasks,
         avgProgress: chartProgress,
         overdueTasks,
+        taskStatus: {
+          labels: ['To Do', 'In Progress', 'Completed'],
+          counts: [todoCount, inProgressCount, completedCount],
+          total: todoCount + inProgressCount + completedCount,
+        },
         summary: {
           totalCompletedThisPeriod: chartTasksCompleted.reduce((a, b) => a + b, 0),
           totalCreatedThisPeriod: chartNewTasks.reduce((a, b) => a + b, 0),
           currentAvgProgress: chartProgress[chartProgress.length - 1] || 0,
+          todo: todoCount,
+          inProgress: inProgressCount,
+          completed: completedCount,
         },
       },
       activities: activities.map((a, i) => ({

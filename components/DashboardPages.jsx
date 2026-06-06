@@ -399,93 +399,48 @@ const DashboardPages = ({
   }, [projectView, selectedProject, activeTab, loadProjectTasks]);
 
   useEffect(() => {
-    if (currentPage !== 'dashboard' || !dashboard?.chart || !chartRef.current) return;
+    if (currentPage !== 'dashboard' || !dashboard?.chart?.taskStatus || !chartRef.current) return;
     if (chartInstance.current) chartInstance.current.destroy();
 
-    const { labels, tasksCompleted, newTasks, avgProgress } = dashboard.chart;
+    const { taskStatus } = dashboard.chart;
     const ctx = chartRef.current.getContext('2d');
-    const barGradient = ctx.createLinearGradient(0, 0, 0, 280);
-    barGradient.addColorStop(0, 'rgba(18, 115, 222, 0.85)');
-    barGradient.addColorStop(1, 'rgba(18, 115, 222, 0.35)');
 
     chartInstance.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels,
+        labels: taskStatus.labels,
         datasets: [
           {
-            type: 'bar',
-            label: 'Tasks Completed',
-            data: tasksCompleted,
-            backgroundColor: barGradient,
+            label: 'Tasks',
+            data: taskStatus.counts,
+            backgroundColor: [
+              'rgba(148, 163, 184, 0.75)',
+              'rgba(59, 130, 246, 0.85)',
+              'rgba(34, 197, 94, 0.85)',
+            ],
             borderRadius: 8,
             borderSkipped: false,
-            yAxisID: 'y',
-            order: 2,
-          },
-          {
-            type: 'bar',
-            label: 'New Tasks',
-            data: newTasks,
-            backgroundColor: 'rgba(148, 163, 184, 0.45)',
-            borderRadius: 8,
-            borderSkipped: false,
-            yAxisID: 'y',
-            order: 3,
-          },
-          {
-            type: 'line',
-            label: 'Avg Project Progress %',
-            data: avgProgress,
-            borderColor: '#0f766e',
-            backgroundColor: 'rgba(15, 118, 110, 0.08)',
-            borderWidth: 2.5,
-            pointRadius: 4,
-            pointBackgroundColor: '#0f766e',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            tension: 0.35,
-            fill: true,
-            yAxisID: 'y1',
-            order: 1,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: {
-            display: true,
-            position: 'bottom',
-            labels: { boxWidth: 10, boxHeight: 10, font: { size: 11, family: 'Plus Jakarta Sans' }, padding: 16 },
-          },
+          legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => {
-                if (ctx.dataset.yAxisID === 'y1') return ` ${ctx.dataset.label}: ${ctx.raw}%`;
-                return ` ${ctx.dataset.label}: ${ctx.raw}`;
-              },
+              label: (ctx) => ` ${ctx.label}: ${ctx.raw} task${ctx.raw === 1 ? '' : 's'}`,
             },
           },
         },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
           y: {
-            position: 'left',
             beginAtZero: true,
             grid: { color: '#f1f5f9' },
             ticks: { stepSize: 1, font: { size: 10 }, color: '#94a3b8' },
             title: { display: true, text: 'Task count', font: { size: 10 }, color: '#94a3b8' },
-          },
-          y1: {
-            position: 'right',
-            beginAtZero: true,
-            max: 100,
-            grid: { drawOnChartArea: false },
-            ticks: { callback: (v) => `${v}%`, font: { size: 10 }, color: '#94a3b8' },
-            title: { display: true, text: 'Progress', font: { size: 10 }, color: '#94a3b8' },
           },
         },
       },
@@ -1054,8 +1009,8 @@ const DashboardPages = ({
             <div className="card chart-card">
               <div className="card-header">
                 <div>
-                  <span className="card-title">Weekly Delivery Metrics</span>
-                  <p className="chart-subtitle">Tasks completed vs new work — with average project progress</p>
+                  <span className="card-title">Task Status Overview</span>
+                  <p className="chart-subtitle">Current breakdown of tasks by status across all projects</p>
                 </div>
                 {dashboard.chart.overdueTasks > 0 && (
                   <span className="chart-overdue-badge">{dashboard.chart.overdueTasks} overdue tasks</span>
@@ -1064,16 +1019,16 @@ const DashboardPages = ({
               <div className="chart-area chart-area-tall"><canvas ref={chartRef} height="180"></canvas></div>
               <div className="chart-stats-row">
                 <div className="chart-stat-pill">
-                  <span className="chart-stat-val">{dashboard.chart.summary?.totalCompletedThisPeriod ?? 0}</span>
-                  <span className="chart-stat-label">Completed (5 wks)</span>
+                  <span className="chart-stat-val">{dashboard.chart.summary?.todo ?? 0}</span>
+                  <span className="chart-stat-label">To Do</span>
                 </div>
                 <div className="chart-stat-pill">
-                  <span className="chart-stat-val">{dashboard.chart.summary?.totalCreatedThisPeriod ?? 0}</span>
-                  <span className="chart-stat-label">New tasks (5 wks)</span>
+                  <span className="chart-stat-val">{dashboard.chart.summary?.inProgress ?? 0}</span>
+                  <span className="chart-stat-label">In Progress</span>
                 </div>
                 <div className="chart-stat-pill">
-                  <span className="chart-stat-val">{dashboard.chart.summary?.currentAvgProgress ?? 0}%</span>
-                  <span className="chart-stat-label">Avg progress now</span>
+                  <span className="chart-stat-val">{dashboard.chart.summary?.completed ?? 0}</span>
+                  <span className="chart-stat-label">Completed</span>
                 </div>
               </div>
             </div>

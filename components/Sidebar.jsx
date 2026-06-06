@@ -135,7 +135,7 @@ const Sidebar = ({
 
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
-      <div className="sidebar-logo">
+      <div className="sidebar-header">
         <Image src={logo1} alt="Engage Now Africa" className="sidebar-logo-img" priority />
         <span className="sidebar-logo-text">Engage Now Africa</span>
       </div>
@@ -143,50 +143,52 @@ const Sidebar = ({
         <button className="mobile-close" onClick={onClose} aria-label="Close menu">✕</button>
       )}
 
-      <nav className="nav">
-        <div className="nav-section-label">Overview</div>
-        {mainNav.map(renderNavItem)}
+      <div className="sidebar-body">
+        <nav className="nav">
+          <div className="nav-section-label">Overview</div>
+          {mainNav.map(renderNavItem)}
 
-        <div className="nav-section-label">Manage</div>
-        {manageNav.map(renderNavItem)}
-      </nav>
+          <div className="nav-section-label">Manage</div>
+          {manageNav.map(renderNavItem)}
+        </nav>
 
-      {pinnedProjects.length > 0 && (
-        <div className="sidebar-pinned">
-          <div className="sidebar-pinned-label">Pinned Projects</div>
-          {pinnedProjects.map((pin) => (
-            <div key={pin.projectId} className="sidebar-pinned-item">
-              <button
-                type="button"
-                className="sidebar-pinned-toggle"
-                onClick={() => setExpandedPins((prev) => ({ ...prev, [pin.projectId]: !prev[pin.projectId] }))}
-                aria-label="Expand project"
-              >
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="12" height="12"
-                  style={{ transform: expandedPins[pin.projectId] ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
-              <span className="sidebar-pinned-dot" />
-              <button
-                type="button"
-                className="sidebar-pinned-name"
-                onClick={() => onOpenProject?.(pin)}
-                title={pin.name}
-              >
-                {pin.name.length > 22 ? `${pin.name.slice(0, 22)}…` : pin.name}
-              </button>
-              {expandedPins[pin.projectId] && (
-                <div className="sidebar-pinned-sub">
-                  <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'tasks' })}>Tasks</button>
-                  <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'overview' })}>Overview</button>
-                  <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'budget' })}>Budget</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+        {pinnedProjects.length > 0 && (
+          <div className="sidebar-pinned">
+            <div className="sidebar-pinned-label">Pinned Projects</div>
+            {pinnedProjects.map((pin) => (
+              <div key={pin.projectId} className="sidebar-pinned-item">
+                <button
+                  type="button"
+                  className="sidebar-pinned-toggle"
+                  onClick={() => setExpandedPins((prev) => ({ ...prev, [pin.projectId]: !prev[pin.projectId] }))}
+                  aria-label="Expand project"
+                >
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="12" height="12"
+                    style={{ transform: expandedPins[pin.projectId] ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+                <span className="sidebar-pinned-dot" />
+                <button
+                  type="button"
+                  className="sidebar-pinned-name"
+                  onClick={() => onOpenProject?.(pin)}
+                  title={pin.name}
+                >
+                  {pin.name.length > 22 ? `${pin.name.slice(0, 22)}…` : pin.name}
+                </button>
+                {expandedPins[pin.projectId] && (
+                  <div className="sidebar-pinned-sub">
+                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'tasks' })}>Tasks</button>
+                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'overview' })}>Overview</button>
+                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'budget' })}>Budget</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="sidebar-footer">
         <div

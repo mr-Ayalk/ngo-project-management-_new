@@ -31,6 +31,7 @@ model User {
   projectMembers   ProjectMember[]
   pinnedProjects   PinnedProject[]
   taskComments     TaskComment[]   @relation("CommentSender")
+  taskDeliverables TaskDeliverable[] @relation("TaskDeliverableCreator")
 }
 
 model Organization {
@@ -135,8 +136,25 @@ model Task {
   updatedAt   DateTime      @updatedAt
   activities  Activity[]
   comments    TaskComment[]
+  deliverables TaskDeliverable[]
   assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
   project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model TaskDeliverable {
+  id          String   @id @default(cuid())
+  taskId      String
+  title       String?
+  description String?  @db.Text
+  fileUrl     String?
+  fileName    String?
+  fileType    String?
+  fileSize    String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator     User     @relation("TaskDeliverableCreator", fields: [createdById], references: [id])
 }
 
 model TaskComment {

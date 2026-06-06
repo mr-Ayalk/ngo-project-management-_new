@@ -83,9 +83,8 @@ export default function LoginPage() {
 
           <div className="login-form-card">
             <div className="login-form-header">
-              <div className="login-form-badge">Staff Workspace</div>
               <h2>Welcome back</h2>
-              <p>Sign in to your organization workspace</p>
+              <p>Sign in to your organization account</p>
             </div>
 
             <form className="login-form" onSubmit={handleSubmit}>
@@ -149,13 +148,13 @@ export default function LoginPage() {
                     Signing in…
                   </span>
                 ) : (
-                  'Sign in to workspace'
+                  'Sign in'
                 )}
               </button>
             </form>
 
             <p className="login-footer-note">
-              Secured workspace · Engage Now Africa
+              Secured access · Engage Now Africa
             </p>
           </div>
         </div>
