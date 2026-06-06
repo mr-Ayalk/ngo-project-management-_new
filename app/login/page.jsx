@@ -10,6 +10,11 @@ export default function LoginRoute() {
   const router = useRouter();
 
   useEffect(() => {
+    document.body.classList.add('login-page-active');
+    return () => document.body.classList.remove('login-page-active');
+  }, []);
+
+  useEffect(() => {
     if (!loading && user) {
       router.replace('/dashboard');
     }

@@ -384,47 +384,54 @@ body, button, input, select, textarea {
 }
 
 .login-panel-brand {
-  background: linear-gradient(145deg, #0f766e 0%, #0d9488 40%, #115e59 100%);
+  background: linear-gradient(145deg, #0a3a8c 0%, #1157c9 45%, #1273de 100%);
 }
 
 .login-headline {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 700;
+  font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
   font-size: 2.25rem;
   letter-spacing: -0.03em;
 }
 
 .login-panel-form {
-  background: #fff;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef4fc 100%);
 }
 
 .login-form-header h2 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 700;
+  font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
   font-size: 1.75rem;
   letter-spacing: -0.02em;
 }
 
 .login-field input {
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   padding: 12px 14px;
   transition: all var(--transition);
 }
 
 .login-field input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  border-color: #1273de;
+  box-shadow: 0 0 0 3px rgba(18, 115, 222, 0.15);
 }
 
-.login-submit {
+.login-page .login-submit {
   padding: 13px;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   font-size: 15px;
+  background: linear-gradient(135deg, #1273de 0%, #0f63c3 100%) !important;
+  box-shadow: 0 4px 14px rgba(18, 115, 222, 0.35);
+}
+
+.login-page .login-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0f63c3 0%, #0a3a8c 100%) !important;
+  box-shadow: 0 6px 20px rgba(18, 115, 222, 0.4);
 }
 
 .login-spinner {
-  border-top-color: var(--primary);
+  border-top-color: #1273de;
 }
 
 /* Status badges */
