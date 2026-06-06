@@ -10,6 +10,7 @@ import MessagesInbox from '@/components/MessagesInbox';
 import DocumentsLibrary from '@/components/DocumentsLibrary';
 import LogisticsPage from '@/components/LogisticsPage';
 import ProfileSettings from '@/components/ProfileSettings';
+import ReportsDashboard from '@/components/ReportsDashboard';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
@@ -109,7 +110,7 @@ const DashboardPages = ({
   const [projects, setProjects] = useState([]);
   const [calendar, setCalendar] = useState(null);
   const [budget, setBudget] = useState(null);
-  const [reports, setReports] = useState([]);
+  const [reportsDashboard, setReportsDashboard] = useState(null);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docSearch, setDocSearch] = useState('');
@@ -220,7 +221,7 @@ const DashboardPages = ({
           setBudget(await api.budget());
           break;
         case 'reports':
-          setReports(await api.reports());
+          setReportsDashboard(await api.reportsDashboard());
           break;
         case 'beneficiaries': {
           const params = {};
@@ -1425,32 +1426,14 @@ const DashboardPages = ({
 
       {/* ── REPORTS ── */}
       {currentPage === 'reports' && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Reports</h1></div>
-            <button className="btn-primary" onClick={() => { setReportForm(EMPTY_REPORT); setReportFile(null); setModal('report'); }}>+ New Report</button>
-          </div>
-          <div className="reports-grid">
-            {reports.map((report) => (
-              <div key={report.id} className="report-card" onClick={() => openReportDetail(report)}>
-                <div className="report-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-                <div className="report-name">{report.name}</div>
-                <div className="report-date">{report.date}</div>
-                {report.description && (
-                  <p className="report-preview">{report.description.length > 120 ? `${report.description.slice(0, 120)}…` : report.description}</p>
-                )}
-                {isManager && (
-                  <button
-                    type="button"
-                    className="card-delete-btn"
-                    onClick={(e) => { e.stopPropagation(); handleDeleteReport(report.id); }}
-                    aria-label="Delete report"
-                  >Delete</button>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
+        <ReportsDashboard
+          data={reportsDashboard}
+          loading={loading && !reportsDashboard}
+          isManager={isManager}
+          onAddManualReport={() => { setReportForm(EMPTY_REPORT); setReportFile(null); setModal('report'); }}
+          onOpenReport={openReportDetail}
+          onDeleteReport={handleDeleteReport}
+        />
       )}
 
       {/* ── BENEFICIARIES ── */}
@@ -1861,7 +1844,7 @@ const DashboardPages = ({
         </form>
       </Modal>
 
-      <Modal open={modal === 'report'} title="New Report" onClose={closeModal}>
+      <Modal open={modal === 'report'} title="Add Manual Report" onClose={closeModal}>
         <form onSubmit={handleSaveReport}>
           <div className="form-field"><label>Name *</label><input required value={reportForm.name} onChange={(e) => setReportForm({ ...reportForm, name: e.target.value })} /></div>
           <div className="form-field"><label>Description</label><textarea rows={8} value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} placeholder="Write a detailed report summary, findings, recommendations…" /></div>

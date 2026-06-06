@@ -17,9 +17,9 @@ export const ourFileRouter = {
     .onUploadComplete(async ({ metadata, file }) => {
       await prisma.user.update({
         where: { id: metadata.userId },
-        data: { avatar: file.url || file.ufsUrl },
+        data: { avatar: file.ufsUrl || file.url },
       });
-      return { url: file.url || file.ufsUrl };
+      return { url: file.ufsUrl || file.url };
     }),
 };
 

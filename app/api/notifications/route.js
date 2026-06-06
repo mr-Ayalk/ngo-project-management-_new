@@ -3,6 +3,12 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth, timeAgo } from '@/lib/api-utils';
 
+function isDbUnavailable(err) {
+  return err?.code === 'P1001' || err?.code === 'P1017' || err?.code === 'P2024';
+}
+
+const EMPTY_NOTIFICATIONS = { unreadCount: 0, notifications: [] };
+
 export async function GET(req) {
   try {
     const auth = await requireAuth(req);
@@ -34,6 +40,10 @@ export async function GET(req) {
       })),
     });
   } catch (err) {
+    if (isDbUnavailable(err)) {
+      console.warn('Notifications unavailable — database unreachable');
+      return json(EMPTY_NOTIFICATIONS);
+    }
     console.error('Notifications GET error:', err);
     return error('Failed to load notifications', 500);
   }
