@@ -39,6 +39,7 @@ model User {
   submittedReports Report[]        @relation("ReportSubmitter")
   approvedReports  Report[]        @relation("ReportApprover")
   scopeMappings    UserScopeMapping[]
+  planActivities   PlanActivity[]  @relation("PlanActivityAssignee")
 }
 
 model Organization {
@@ -122,6 +123,75 @@ model ReportWorkflowRule {
   updatedAt      DateTime @updatedAt
 }
 
+model PlanOutcome {
+  id          String       @id @default(cuid())
+  projectId   String
+  title       String
+  description String?      @db.Text
+  indicator   String?
+  targetValue Float?
+  baseline    Float?
+  unit        String?
+  status      String       @default("on-track")
+  progress    Int          @default(0)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  outputs     PlanOutput[]
+
+  @@index([projectId])
+}
+
+model PlanOutput {
+  id             String         @id @default(cuid())
+  outcomeId      String
+  projectId      String
+  title          String
+  description    String?        @db.Text
+  deliverable    String?
+  targetQty      Float?
+  achievedQty    Float?         @default(0)
+  unit           String?
+  dueDate        DateTime?
+  status         String         @default("planned")
+  progress       Int            @default(0)
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  outcome        PlanOutcome    @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  planActivities PlanActivity[]
+
+  @@index([outcomeId])
+  @@index([projectId])
+}
+
+model PlanActivity {
+  id          String      @id @default(cuid())
+  outputId    String?
+  projectId   String
+  title       String
+  description String?     @db.Text
+  assigneeId  String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String      @default("planned")
+  priority    String      @default("medium")
+  location    String?
+  budget      Float?
+  progress    Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  output      PlanOutput? @relation(fields: [outputId], references: [id], onDelete: SetNull)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?       @relation("PlanActivityAssignee", fields: [assigneeId], references: [id])
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([outputId])
+}
+
 model Project {
   id                   String               @id @default(cuid())
   name                 String
@@ -165,6 +235,9 @@ model Project {
   comments             TaskComment[]
   tasks                Task[]
   reports              Report[]
+  planOutcomes         PlanOutcome[]
+  planOutputs          PlanOutput[]
+  planActivities       PlanActivity[]
 }
 
 model ProjectMember {

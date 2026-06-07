@@ -50,6 +50,9 @@ async function main() {
   await prisma.reportWorkflowRule.deleteMany();
   await prisma.programIndicator.deleteMany();
   await prisma.orgUnit.deleteMany();
+  await prisma.planActivity.deleteMany();
+  await prisma.planOutput.deleteMany();
+  await prisma.planOutcome.deleteMany();
   await prisma.task.deleteMany();
   await prisma.project.deleteMany();
   await prisma.organization.deleteMany();
@@ -290,6 +293,122 @@ async function main() {
   ]);
 
   const [health, education, water, women, youth] = projects;
+
+  const waterOutcome = await prisma.planOutcome.create({
+    data: {
+      projectId: water.id,
+      title: 'Communities access safe drinking water',
+      description: 'Reduced waterborne disease and improved health outcomes in target woredas.',
+      indicator: 'Households with access to safe water',
+      targetValue: 5000,
+      baseline: 3200,
+      unit: 'households',
+      status: 'on-track',
+      progress: 62,
+    },
+  });
+
+  const eduOutcome = await prisma.planOutcome.create({
+    data: {
+      projectId: education.id,
+      title: 'Improved literacy among out-of-school children',
+      description: 'Children demonstrate grade-level reading and numeracy skills.',
+      indicator: 'Children meeting literacy benchmarks',
+      targetValue: 1200,
+      baseline: 800,
+      unit: 'children',
+      status: 'on-track',
+      progress: 78,
+    },
+  });
+
+  const waterOutput = await prisma.planOutput.create({
+    data: {
+      projectId: water.id,
+      outcomeId: waterOutcome.id,
+      title: 'Boreholes drilled and operational',
+      deliverable: 'Functional water points with community management committees',
+      targetQty: 24,
+      achievedQty: 15,
+      unit: 'sites',
+      dueDate: new Date('2024-08-01'),
+      status: 'in_progress',
+      progress: 62,
+    },
+  });
+
+  await prisma.planOutput.create({
+    data: {
+      projectId: education.id,
+      outcomeId: eduOutcome.id,
+      title: 'Community learning centers established',
+      deliverable: 'Centers equipped with materials and trained facilitators',
+      targetQty: 18,
+      achievedQty: 14,
+      unit: 'centers',
+      dueDate: new Date('2024-06-15'),
+      status: 'in_progress',
+      progress: 78,
+    },
+  });
+
+  await Promise.all([
+    prisma.planActivity.create({
+      data: {
+        projectId: water.id,
+        outputId: waterOutput.id,
+        title: 'Site survey — East Shewa woredas',
+        description: 'Hydrogeological assessment and community consultation for borehole placement.',
+        assigneeId: james.id,
+        startDate: new Date('2024-04-01'),
+        endDate: new Date('2024-05-15'),
+        status: 'completed',
+        priority: 'high',
+        location: 'East Shewa, Oromia',
+        progress: 100,
+      },
+    }),
+    prisma.planActivity.create({
+      data: {
+        projectId: water.id,
+        outputId: waterOutput.id,
+        title: 'Drilling operations — Batch 3',
+        assigneeId: james.id,
+        startDate: new Date('2024-05-01'),
+        endDate: new Date('2024-06-30'),
+        status: 'in_progress',
+        priority: 'high',
+        location: 'Adama Woreda',
+        progress: 45,
+      },
+    }),
+    prisma.planActivity.create({
+      data: {
+        projectId: education.id,
+        title: 'Teacher facilitator training workshop',
+        assigneeId: grace.id,
+        startDate: new Date('2024-05-10'),
+        endDate: new Date('2024-05-20'),
+        status: 'planned',
+        priority: 'medium',
+        location: 'Addis Ababa',
+        progress: 0,
+      },
+    }),
+    prisma.planActivity.create({
+      data: {
+        projectId: women.id,
+        title: 'Skills training — tailoring cohort',
+        assigneeId: ruth.id,
+        startDate: new Date('2024-05-05'),
+        endDate: new Date('2024-06-05'),
+        status: 'in_progress',
+        priority: 'medium',
+        location: 'SNNPR',
+        progress: 35,
+      },
+    }),
+  ]);
 
   const tasks = [
     { title: 'Training session for volunteers', projectId: health.id, status: 'todo', priority: 'medium', dueDate: '2024-05-06', assigneeId: ruth.id },

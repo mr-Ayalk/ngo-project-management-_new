@@ -14,8 +14,10 @@ import ReportsDashboard from '@/components/ReportsDashboard';
 import ReportsManagement from '@/components/ReportsManagement';
 import ReportsApproval from '@/components/ReportsApproval';
 import ConfigurationHub from '@/components/ConfigurationHub';
+import PlanningModule from '@/components/PlanningModule';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import { isConfigPage } from '@/lib/config-pages';
+import { isPlanningPage } from '@/lib/planning-pages';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
@@ -132,6 +134,7 @@ const DashboardPages = ({
   const [reportsDashboard, setReportsDashboard] = useState(null);
   const [typedReports, setTypedReports] = useState([]);
   const [configData, setConfigData] = useState(null);
+  const [planningData, setPlanningData] = useState(null);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docSearch, setDocSearch] = useState('');
@@ -314,6 +317,27 @@ const DashboardPages = ({
           await Promise.all(tasks);
           break;
         }
+        case 'planning':
+          setPlanningData(await api.planning());
+          break;
+        case 'planning-projects': {
+          const list = await api.projects();
+          setProjects(list);
+          setPlanningData({ projects: list });
+          break;
+        }
+        case 'planning-outcomes':
+          setPlanningData(await api.planningOutcomes());
+          break;
+        case 'planning-outputs':
+          setPlanningData(await api.planningOutputs());
+          break;
+        case 'planning-activities':
+          setPlanningData(await api.planningActivities());
+          break;
+        case 'planning-my-activities':
+          setPlanningData(await api.planningActivities({ mine: 'true' }));
+          break;
         default:
           if (isConfigPage(currentPage)) {
             setConfigData(await api.config());
@@ -1037,6 +1061,125 @@ const DashboardPages = ({
     }
   };
 
+  const handleCreatePlanningOutcome = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createPlanningOutcome(body);
+      showToast('Outcome added');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdatePlanningOutcome = async (id, body) => {
+    setSubmitting(true);
+    try {
+      await api.updatePlanningOutcome(id, body);
+      showToast('Outcome updated');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePlanningOutcome = async (id) => {
+    const ok = await confirmToast('Remove this outcome?', { description: 'Linked outputs may be affected.' });
+    if (!ok) return;
+    try {
+      await api.deletePlanningOutcome(id);
+      showToast('Outcome removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleCreatePlanningOutput = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createPlanningOutput(body);
+      showToast('Output added');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdatePlanningOutput = async (id, body) => {
+    setSubmitting(true);
+    try {
+      await api.updatePlanningOutput(id, body);
+      showToast('Output updated');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePlanningOutput = async (id) => {
+    const ok = await confirmToast('Remove this output?', { description: 'Linked activities will be unlinked.' });
+    if (!ok) return;
+    try {
+      await api.deletePlanningOutput(id);
+      showToast('Output removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleCreatePlanningActivity = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createPlanningActivity(body);
+      showToast('Activity scheduled');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdatePlanningActivity = async (id, body) => {
+    setSubmitting(true);
+    try {
+      await api.updatePlanningActivity(id, body);
+      showToast('Activity updated');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePlanningActivity = async (id) => {
+    const ok = await confirmToast('Remove this activity?', { description: 'This cannot be undone.' });
+    if (!ok) return;
+    try {
+      await api.deletePlanningActivity(id);
+      showToast('Activity removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const openPlanningProject = (proj) => {
+    onNavigate?.('projects');
+    setTimeout(() => openProjectDetail(proj), 0);
+  };
+
   const handleReportFileSelect = (file) => {
     if (!file) return;
     setReportFile(file);
@@ -1708,6 +1851,31 @@ const DashboardPages = ({
           onDeleteScope={handleDeleteConfigScope}
           onSaveWorkflow={handleSaveReportWorkflow}
           showToast={showToast}
+        />
+      )}
+
+      {isPlanningPage(currentPage) && (
+        <PlanningModule
+          planningPage={currentPage}
+          data={planningData}
+          loading={loading && !planningData}
+          isManager={isManager}
+          submitting={submitting}
+          firstName={firstName}
+          projects={projects}
+          onNavigate={onNavigate}
+          onOpenProject={openPlanningProject}
+          onCreateProject={() => openProjectModal()}
+          onRefresh={loadPageData}
+          onCreateOutcome={handleCreatePlanningOutcome}
+          onUpdateOutcome={handleUpdatePlanningOutcome}
+          onDeleteOutcome={handleDeletePlanningOutcome}
+          onCreateOutput={handleCreatePlanningOutput}
+          onUpdateOutput={handleUpdatePlanningOutput}
+          onDeleteOutput={handleDeletePlanningOutput}
+          onCreateActivity={handleCreatePlanningActivity}
+          onUpdateActivity={handleUpdatePlanningActivity}
+          onDeleteActivity={handleDeletePlanningActivity}
         />
       )}
 

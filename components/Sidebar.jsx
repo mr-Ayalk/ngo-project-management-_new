@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { REPORT_TYPES } from '@/lib/report-types';
 import { CONFIG_PAGES, CONFIG_EXTRA } from '@/lib/config-pages';
+import { PLANNING_PAGES } from '@/lib/planning-pages';
 import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({
@@ -20,10 +21,10 @@ const Sidebar = ({
   const { logout } = useAuth();
   const [reportsExpanded, setReportsExpanded] = useState(true);
   const [configExpanded, setConfigExpanded] = useState(true);
+  const [planningExpanded, setPlanningExpanded] = useState(true);
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { id: 'projects', label: 'Projects', icon: 'projects' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'budget', label: 'Budget', icon: 'budget' },
   ];
@@ -142,6 +143,18 @@ const Sidebar = ({
 
   const reportGroupActive = currentPage.startsWith('reports-') || currentPage === 'reports';
   const configGroupActive = currentPage.startsWith('config-');
+  const planningGroupActive = currentPage === 'planning' || currentPage.startsWith('planning-');
+
+  const planningSubIcon = (pageId) => {
+    const icons = {
+      'planning-projects': '📁',
+      'planning-outcomes': '🎯',
+      'planning-outputs': '📦',
+      'planning-activities': '✅',
+      'planning-my-activities': '👤',
+    };
+    return icons[pageId] || '•';
+  };
 
   const configSubIcon = (pageId) => {
     const icons = {
@@ -170,8 +183,59 @@ const Sidebar = ({
 
       <div className="sidebar-body">
         <nav className="nav">
-          <div className="nav-section-label">Overview</div>
+          <div className="nav-section-label">Menu</div>
           {mainNav.map(renderNavItem)}
+          <div
+            className={`nav-item${currentPage === 'settings' ? ' active' : ''}`}
+            onClick={() => onPageChange('settings')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('settings')}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            User Management
+          </div>
+
+          <div className="nav-section-label">Planning Module</div>
+          <div className={`nav-group${planningExpanded ? ' open' : ''}${planningGroupActive ? ' active-group' : ''}`}>
+            <button
+              type="button"
+              className="nav-group-toggle"
+              onClick={() => setPlanningExpanded((v) => !v)}
+              aria-expanded={planningExpanded}
+            >
+              {renderIcon('projects')}
+              <span>Planning Module</span>
+              <svg className="nav-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {planningExpanded && (
+              <div className="nav-sub-list plan-sub-list">
+                <button
+                  type="button"
+                  className={`nav-sub-item plan-sub-item${currentPage === 'planning' ? ' active' : ''}`}
+                  onClick={() => onPageChange('planning')}
+                >
+                  <span className="plan-sub-icon" aria-hidden="true">⌂</span>
+                  Overview
+                </button>
+                {PLANNING_PAGES.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    className={`nav-sub-item plan-sub-item${currentPage === page.id ? ' active' : ''}`}
+                    onClick={() => onPageChange(page.id)}
+                  >
+                    <span className="plan-sub-icon" aria-hidden="true">{planningSubIcon(page.id)}</span>
+                    {page.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="nav-section-label">Reports</div>
           <div className={`nav-group${reportsExpanded ? ' open' : ''}${reportGroupActive ? ' active-group' : ''}`}>
