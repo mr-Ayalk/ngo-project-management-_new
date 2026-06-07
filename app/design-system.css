@@ -878,6 +878,19 @@ body, button, input, select, textarea {
   transition: background 0.15s;
 }
 .inbox-project-row:hover { background: #eef4fc; }
+.inbox-channel-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.inbox-channel-row.active {
+  background: #1273de;
+  color: #fff;
+}
+.inbox-channel-row.active .inbox-project-name { color: #fff; }
 .inbox-chevron { width: 16px; height: 16px; transition: transform 0.2s; flex-shrink: 0; color: #94a3b8; }
 .inbox-chevron.open { transform: rotate(90deg); }
 .inbox-project-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

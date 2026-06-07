@@ -10,7 +10,12 @@ export default function LocationMap({ region, zone, town, woreda }) {
     return (
       <div className="location-map location-map-empty">
         <div className="location-map-placeholder">
-          <span className="location-map-pin">📍</span>
+          <span className="location-map-pin" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="28" height="28">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+          </span>
           <p>Select a region or town to preview the project location on the map.</p>
         </div>
       </div>

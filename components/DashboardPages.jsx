@@ -12,6 +12,7 @@ import LogisticsPage from '@/components/LogisticsPage';
 import ProfileSettings from '@/components/ProfileSettings';
 import ReportsDashboard from '@/components/ReportsDashboard';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
+import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
 import { isProjectManager, canManageUsers, STAFF_ROLES } from '@/lib/roles';
@@ -357,7 +358,6 @@ const DashboardPages = ({
           onNavigate?.('messages');
           setMsgInitialSelection({
             projectId: pendingNav.projectId,
-            taskId: pendingNav.taskId || null,
           });
           onPendingNavHandled?.();
           return;
@@ -681,6 +681,11 @@ const DashboardPages = ({
 
   const handleSaveEvent = async (e) => {
     e.preventDefault();
+    const today = new Date().toISOString().slice(0, 10);
+    if (eventForm.date < today) {
+      showToast('Events cannot be scheduled on past dates', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       await api.createEvent({
@@ -1108,7 +1113,7 @@ const DashboardPages = ({
               <div className="table-head"><span>Project</span><span>Status</span><span>Progress</span><span>Budget</span><span>Start Date</span><span></span></div>
               {projects.map((proj) => (
                 <div key={proj.id} className="table-row" onClick={() => openProjectDetail(proj)}>
-                  <div className="proj-name-cell"><div className={`proj-icon ${proj.icon}`}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div><span className="proj-name">{proj.name}</span></div>
+                  <div className="proj-name-cell"><ProjectIcon variant={proj.icon} /><span className="proj-name">{proj.name}</span></div>
                   <span><span className={`status-badge ${proj.status}`}><span className="status-dot"></span>{statusLabel(proj.status)}</span></span>
                   <span><div className="prog-wrap"><div className="prog-bar"><div className={`prog-fill${proj.status === 'at-risk' ? ' amber' : proj.status === 'delayed' ? ' red' : ''}`} style={{ width: `${proj.progress}%` }}></div></div><span className="prog-pct">{proj.progress}%</span></div></span>
                   <span className="tbl-budget">{proj.budget}</span>
@@ -1300,14 +1305,27 @@ const DashboardPages = ({
               </div>
               <div className="cal-days-head"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
               <div className="cal-days">
-                {calendar.days.map((day, i) => (
-                  <div key={i} className={`cal-day${day.today ? ' today' : ''}${day.otherMonth ? ' other-month' : ''}${day.events?.length ? ' has-events' : ''}`} onClick={() => !day.otherMonth && (setEventForm({ ...EMPTY_EVENT, date: `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day.num).padStart(2, '0')}` }), setModal('event'))}>
+                {calendar.days.map((day, i) => {
+                  const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day.num).padStart(2, '0')}`;
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const isPast = !day.otherMonth && dateStr < todayStr;
+                  return (
+                  <div
+                    key={i}
+                    className={`cal-day${day.today ? ' today' : ''}${day.otherMonth ? ' other-month' : ''}${day.events?.length ? ' has-events' : ''}${isPast ? ' past-day' : ''}`}
+                    onClick={() => {
+                      if (day.otherMonth || isPast) return;
+                      setEventForm({ ...EMPTY_EVENT, date: dateStr });
+                      setModal('event');
+                    }}
+                  >
                     <div className="cal-day-num">{day.num}</div>
                     <div className="cal-day-events">
                       {day.events?.map((evt, j) => (<div key={j} className={`cal-event ${evt.c}`}>{evt.t}</div>))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <aside className="upcoming-events cal-sidebar">
@@ -1693,7 +1711,7 @@ const DashboardPages = ({
         <form onSubmit={handleSaveEvent}>
           <div className="form-field"><label>Title *</label><input required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} /></div>
           <div className="form-row">
-            <div className="form-field"><label>Date *</label><input type="date" required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} /></div>
+            <div className="form-field"><label>Date *</label><input type="date" required min={new Date().toISOString().slice(0, 10)} value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} /></div>
             <div className="form-field"><label>Color</label><select value={eventForm.color} onChange={(e) => setEventForm({ ...eventForm, color: e.target.value })}><option value="green">Green</option><option value="red">Red</option><option value="amber">Amber</option><option value="blue">Blue</option></select></div>
           </div>
           <div className="form-field"><label><input type="checkbox" checked={eventForm.allDay} onChange={(e) => setEventForm({ ...eventForm, allDay: e.target.checked })} /> All Day</label></div>

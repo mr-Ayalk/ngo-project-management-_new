@@ -16,12 +16,7 @@ export default function MessagesInbox({
 }) {
   const [tab, setTab] = useState('messages');
   const [notifications, setNotifications] = useState({ unreadCount: 0, notifications: [] });
-  const [tasksByProject, setTasksByProject] = useState({});
-  const [expandedProjects, setExpandedProjects] = useState({});
-  const [loadingTasks, setLoadingTasks] = useState({});
   const [msgProjectId, setMsgProjectId] = useState('');
-  const [msgTaskId, setMsgTaskId] = useState('');
-  const [selectedTaskTitle, setSelectedTaskTitle] = useState('');
   const [messages, setMessages] = useState(null);
   const [messageInput, setMessageInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -40,55 +35,31 @@ export default function MessagesInbox({
     loadNotifications();
   }, [loadNotifications]);
 
-  const loadProjectTasks = useCallback(async (projectId) => {
-    if (tasksByProject[projectId]) return tasksByProject[projectId];
-    setLoadingTasks((prev) => ({ ...prev, [projectId]: true }));
-    try {
-      const data = await api.tasks({ projectId });
-      const list = data.tasks || [];
-      setTasksByProject((prev) => ({ ...prev, [projectId]: list }));
-      return list;
-    } catch {
-      setTasksByProject((prev) => ({ ...prev, [projectId]: [] }));
-      return [];
-    } finally {
-      setLoadingTasks((prev) => ({ ...prev, [projectId]: false }));
-    }
-  }, [tasksByProject]);
-
-  const toggleProject = (projectId) => {
-    const next = !expandedProjects[projectId];
-    setExpandedProjects((prev) => ({ ...prev, [projectId]: next }));
-    if (next) loadProjectTasks(projectId);
-  };
-
-  const selectTask = (projectId, task) => {
+  const selectProject = (projectId) => {
     setMsgProjectId(projectId);
-    setMsgTaskId(task.id);
-    setSelectedTaskTitle(task.title);
     setTab('messages');
   };
 
-  const loadTaskMessages = useCallback(async (projectId, taskId) => {
-    if (!projectId || !taskId) return;
+  const loadProjectMessages = useCallback(async (projectId) => {
+    if (!projectId) return;
     try {
-      setMessages(await api.messages({ projectId, taskId }));
+      setMessages(await api.messages({ projectId }));
     } catch {
       setMessages({ messages: [] });
     }
   }, []);
 
   useEffect(() => {
-    if (msgProjectId && msgTaskId) {
-      loadTaskMessages(msgProjectId, msgTaskId);
+    if (msgProjectId) {
+      loadProjectMessages(msgProjectId);
     }
-  }, [msgProjectId, msgTaskId, loadTaskMessages]);
+  }, [msgProjectId, loadProjectMessages]);
 
   useEffect(() => {
-    if (!msgProjectId || !msgTaskId) return undefined;
-    const interval = setInterval(() => loadTaskMessages(msgProjectId, msgTaskId), 10000);
+    if (!msgProjectId) return undefined;
+    const interval = setInterval(() => loadProjectMessages(msgProjectId), 10000);
     return () => clearInterval(interval);
-  }, [msgProjectId, msgTaskId, loadTaskMessages]);
+  }, [msgProjectId, loadProjectMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,51 +72,38 @@ export default function MessagesInbox({
 
   useEffect(() => {
     if (!initialSelection?.projectId) return;
-    const apply = async () => {
-      setTab('messages');
-      setExpandedProjects((prev) => ({ ...prev, [initialSelection.projectId]: true }));
-      const tasks = await loadProjectTasks(initialSelection.projectId);
-      const taskId = initialSelection.taskId || tasks[0]?.id;
-      if (taskId) {
-        const task = tasks.find((t) => t.id === taskId) || { id: taskId, title: 'Task discussion' };
-        setMsgProjectId(initialSelection.projectId);
-        setMsgTaskId(taskId);
-        setSelectedTaskTitle(task.title);
-      }
-      onInitialSelectionHandled?.();
-    };
-    apply();
-  }, [initialSelection, loadProjectTasks, onInitialSelectionHandled]);
+    setTab('messages');
+    setMsgProjectId(initialSelection.projectId);
+    onInitialSelectionHandled?.();
+  }, [initialSelection, onInitialSelectionHandled]);
+
+  const openProjectFromNotification = (projectId) => {
+    setTab('messages');
+    selectProject(projectId);
+  };
 
   const handleNotificationClick = async (n) => {
     try {
       await api.markNotificationRead(n.id);
       loadNotifications();
     } catch { /* ignore */ }
-    if (n.projectId && n.taskId) {
-      setTab('messages');
-      setExpandedProjects((prev) => ({ ...prev, [n.projectId]: true }));
-      const tasks = await loadProjectTasks(n.projectId);
-      const task = tasks.find((t) => t.id === n.taskId) || { id: n.taskId, title: n.title };
-      selectTask(n.projectId, task);
+    if (n.projectId) {
+      openProjectFromNotification(n.projectId);
       onNotificationOpen?.(n);
-    } else if (n.projectId) {
-      onNavigate?.('projects');
     }
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!messageInput.trim() || !msgProjectId || !msgTaskId) return;
+    if (!messageInput.trim() || !msgProjectId) return;
     setSubmitting(true);
     try {
       await api.sendMessage({
         content: messageInput,
         projectId: msgProjectId,
-        taskId: msgTaskId,
       });
       setMessageInput('');
-      await loadTaskMessages(msgProjectId, msgTaskId);
+      await loadProjectMessages(msgProjectId);
       toast.success('Message sent');
     } catch (err) {
       toast.error(err.message || 'Failed to send message');
@@ -162,14 +120,16 @@ export default function MessagesInbox({
     if (!ok) return;
     try {
       await api.deleteMessage(msgId);
-      await loadTaskMessages(msgProjectId, msgTaskId);
+      await loadProjectMessages(msgProjectId);
       toast.success('Message deleted');
     } catch (err) {
       toast.error(err.message || 'Failed to delete message');
     }
   };
 
-  const selectedProjectName = lookup.projects.find((p) => p.id === msgProjectId)?.name || '';
+  const selectedProject = lookup.projects.find((p) => p.id === msgProjectId);
+  const selectedProjectName = selectedProject?.name || '';
+  const messageCount = messages?.messages?.length || 0;
 
   return (
     <div className="inbox-page">
@@ -219,7 +179,7 @@ export default function MessagesInbox({
                 className="inbox-alert-action"
                 onClick={() => handleNotificationClick(n)}
               >
-                {n.taskId ? 'View Task' : 'View Project'}
+                View Project
               </button>
             </div>
           )) : (
@@ -231,44 +191,17 @@ export default function MessagesInbox({
       {tab === 'messages' && (
         <div className="inbox-messages-layout">
           <aside className="inbox-sidebar">
-            <div className="inbox-sidebar-label">Projects & Tasks</div>
+            <div className="inbox-sidebar-label">Channels</div>
             <div className="inbox-project-list">
               {lookup.projects.length ? lookup.projects.map((project) => (
-                <div key={project.id} className="inbox-project-group">
-                  <button
-                    type="button"
-                    className={`inbox-project-row${expandedProjects[project.id] ? ' expanded' : ''}`}
-                    onClick={() => toggleProject(project.id)}
-                  >
-                    <svg className={`inbox-chevron${expandedProjects[project.id] ? ' open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                    <span className="inbox-project-name">{project.name}</span>
-                  </button>
-                  {expandedProjects[project.id] && (
-                    <div className="inbox-task-list">
-                      {loadingTasks[project.id] && (
-                        <div className="inbox-task-loading">Loading tasks…</div>
-                      )}
-                      {!loadingTasks[project.id] && (tasksByProject[project.id] || []).map((task) => (
-                        <button
-                          key={task.id}
-                          type="button"
-                          className={`inbox-task-row${msgTaskId === task.id && msgProjectId === project.id ? ' active' : ''}`}
-                          onClick={() => selectTask(project.id, task)}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                          </svg>
-                          <span>{task.title}</span>
-                        </button>
-                      ))}
-                      {!loadingTasks[project.id] && !(tasksByProject[project.id] || []).length && (
-                        <div className="inbox-task-empty">No tasks</div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={project.id}
+                  type="button"
+                  className={`inbox-project-row inbox-channel-row${msgProjectId === project.id ? ' active' : ''}`}
+                  onClick={() => selectProject(project.id)}
+                >
+                  <span className="inbox-project-name">{project.name}</span>
+                </button>
               )) : (
                 <p className="inbox-empty">No projects available.</p>
               )}
@@ -277,23 +210,25 @@ export default function MessagesInbox({
 
           <div className="inbox-chat-panel">
             <div className="inbox-chat-header">
-              {msgTaskId ? (
+              {msgProjectId ? (
                 <>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                   <div>
-                    <div className="inbox-chat-title">{selectedTaskTitle}</div>
-                    <div className="inbox-chat-sub">{selectedProjectName}</div>
+                    <div className="inbox-chat-title">{selectedProjectName}</div>
+                    <div className="inbox-chat-sub">
+                      {messageCount ? `${messageCount} message${messageCount === 1 ? '' : 's'}` : 'No messages yet'}
+                    </div>
                   </div>
                 </>
               ) : (
-                <div className="inbox-chat-title muted">Select a task to start messaging</div>
+                <div className="inbox-chat-title muted">Select a project channel to start messaging</div>
               )}
             </div>
 
             <div className="inbox-chat-messages">
-              {msgTaskId && messages?.messages?.length ? messages.messages.map((msg) => (
+              {msgProjectId && messages?.messages?.length ? messages.messages.map((msg) => (
                 <div key={msg.id} className={`message-bubble${msg.isOwn ? ' own' : ''}`}>
                   {!msg.isOwn && <div className="msg-avatar" style={{ background: msg.color }}>{msg.initials}</div>}
                   <div className="msg-body">
@@ -312,9 +247,9 @@ export default function MessagesInbox({
                 </div>
               )) : (
                 <p className="messages-empty inbox-chat-empty">
-                  {msgTaskId
-                    ? 'No messages in this task yet. Start a conversation!'
-                    : 'Choose a project and task from the sidebar to view messages.'}
+                  {msgProjectId
+                    ? 'No messages in this channel yet. Start a conversation!'
+                    : 'Choose a project from the sidebar to view messages.'}
                 </p>
               )}
               <div ref={messagesEndRef} />
@@ -326,9 +261,9 @@ export default function MessagesInbox({
                 placeholder="Type your message..."
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
-                disabled={!msgProjectId || !msgTaskId || submitting}
+                disabled={!msgProjectId || submitting}
               />
-              <button type="submit" className="inbox-send-btn" disabled={submitting || !msgProjectId || !msgTaskId || !messageInput.trim()} aria-label="Send message">
+              <button type="submit" className="inbox-send-btn" disabled={submitting || !msgProjectId || !messageInput.trim()} aria-label="Send message">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                 </svg>

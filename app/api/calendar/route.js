@@ -125,6 +125,14 @@ export async function POST(req) {
     const body = await parseBody(req);
     if (!body?.title || !body?.date) return error('Title and date are required');
 
+    const eventDate = new Date(body.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+    if (eventDate < today) {
+      return error('Events cannot be scheduled on past dates', 400);
+    }
+
     const event = await prisma.calendarEvent.create({
       data: {
         title: body.title,

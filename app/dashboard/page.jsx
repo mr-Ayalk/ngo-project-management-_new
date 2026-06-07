@@ -63,8 +63,6 @@ export default function DashboardPage() {
       setCurrentPage('messages');
       setPendingNav({
         projectId: notif.projectId,
-        tab: 'tasks',
-        taskId: notif.taskId,
         openMessages: true,
       });
     } else {

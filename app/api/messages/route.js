@@ -3,6 +3,38 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
 
+async function collectMessageRecipients(projectId, senderId, taskId = null) {
+  const [members, project, admins, task] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { projectId },
+      select: { userId: true },
+    }),
+    prisma.project.findUnique({
+      where: { id: projectId },
+      select: { name: true, managerId: true, leadId: true },
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ['admin', 'manager', 'project_manager'] }, isActive: true },
+      select: { id: true },
+    }),
+    taskId
+      ? prisma.task.findUnique({
+          where: { id: taskId },
+          select: { title: true, assigneeId: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const recipientIds = new Set();
+  members.forEach((m) => { if (m.userId !== senderId) recipientIds.add(m.userId); });
+  if (project?.managerId && project.managerId !== senderId) recipientIds.add(project.managerId);
+  if (project?.leadId && project.leadId !== senderId) recipientIds.add(project.leadId);
+  if (task?.assigneeId && task.assigneeId !== senderId) recipientIds.add(task.assigneeId);
+  admins.forEach((a) => { if (a.id !== senderId) recipientIds.add(a.id); });
+
+  return { recipientIds, project, task };
+}
+
 export async function GET(req) {
   try {
     const auth = await requireAuth(req);
@@ -14,7 +46,11 @@ export async function GET(req) {
 
     const where = {};
     if (projectId) where.projectId = projectId;
-    if (taskId) where.taskId = taskId;
+    if (taskId) {
+      where.taskId = taskId;
+    } else if (projectId) {
+      where.taskId = null;
+    }
 
     const messages = await prisma.message.findMany({
       where,
@@ -52,58 +88,40 @@ export async function POST(req) {
 
     const body = await parseBody(req);
     if (!body?.content) return error('Content is required');
+    if (!body?.projectId) return error('projectId is required');
 
     const message = await prisma.message.create({
       data: {
         content: body.content.trim(),
         senderId: auth.user.id,
         recipientId: body.recipientId || null,
-        projectId: body.projectId || null,
+        projectId: body.projectId,
         taskId: body.taskId || null,
       },
       include: { sender: { select: { id: true, name: true } } },
     });
 
-    if (body.projectId && body.taskId) {
-      const task = await prisma.task.findUnique({
-        where: { id: body.taskId },
-        select: { title: true, assigneeId: true, projectId: true },
+    const { recipientIds, project, task } = await collectMessageRecipients(
+      body.projectId,
+      auth.user.id,
+      body.taskId || null
+    );
+
+    if (recipientIds.size > 0) {
+      const isTaskMessage = Boolean(body.taskId);
+      await prisma.notification.createMany({
+        data: [...recipientIds].map((userId) => ({
+          userId,
+          title: isTaskMessage
+            ? `New message on "${task?.title || 'task'}"`
+            : `New message in "${project?.name || 'project'}"`,
+          message: `${message.sender.name}: ${body.content.trim().slice(0, 100)}`,
+          type: isTaskMessage ? 'task_message' : 'project_message',
+          projectId: body.projectId,
+          taskId: body.taskId || null,
+          linkType: isTaskMessage ? 'task_message' : 'project_message',
+        })),
       });
-      const [members, project, admins] = await Promise.all([
-        prisma.projectMember.findMany({
-          where: { projectId: body.projectId },
-          select: { userId: true },
-        }),
-        prisma.project.findUnique({
-          where: { id: body.projectId },
-          select: { name: true, managerId: true, leadId: true },
-        }),
-        prisma.user.findMany({
-          where: { role: { in: ['admin', 'manager', 'project_manager'] }, isActive: true },
-          select: { id: true },
-        }),
-      ]);
-
-      const recipientIds = new Set();
-      members.forEach((m) => { if (m.userId !== auth.user.id) recipientIds.add(m.userId); });
-      if (project?.managerId && project.managerId !== auth.user.id) recipientIds.add(project.managerId);
-      if (project?.leadId && project.leadId !== auth.user.id) recipientIds.add(project.leadId);
-      if (task?.assigneeId && task.assigneeId !== auth.user.id) recipientIds.add(task.assigneeId);
-      admins.forEach((a) => { if (a.id !== auth.user.id) recipientIds.add(a.id); });
-
-      if (recipientIds.size > 0) {
-        await prisma.notification.createMany({
-          data: [...recipientIds].map((userId) => ({
-            userId,
-            title: `New message on "${task?.title || 'task'}"`,
-            message: `${message.sender.name} in ${project?.name || 'project'}: ${body.content.trim().slice(0, 100)}`,
-            type: 'task_message',
-            projectId: body.projectId,
-            taskId: body.taskId,
-            linkType: 'task_message',
-          })),
-        });
-      }
     }
 
     return json(

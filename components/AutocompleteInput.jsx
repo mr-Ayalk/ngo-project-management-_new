@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-export default function AutocompleteInput({ value, onChange, options = [], placeholder = '', label, onSelect }) {
+export default function AutocompleteInput({ value, onChange, options = [], placeholder = '', label, onSelect, disabled = false }) {
   const [open, setOpen] = useState(false);
   const [filtered, setFiltered] = useState([]);
   const wrapRef = useRef(null);
@@ -36,8 +36,9 @@ export default function AutocompleteInput({ value, onChange, options = [], place
         type="text"
         value={value || ''}
         placeholder={placeholder}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
+        disabled={disabled}
+        onChange={(e) => { if (!disabled) { onChange(e.target.value); setOpen(true); } }}
+        onFocus={() => { if (!disabled) setOpen(true); }}
         autoComplete="off"
       />
       {open && filtered.length > 0 && (

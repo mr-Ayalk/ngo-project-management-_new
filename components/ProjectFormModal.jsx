@@ -1,11 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import Modal from '@/components/Modal';
 import AutocompleteInput from '@/components/AutocompleteInput';
 import LocationMap from '@/components/LocationMap';
 import {
-  REGIONS, ZONES, TOWNS, KEBELES, WOREDAS, WOREDA_BUDGETS,
+  REGIONS, KEBELES, WOREDAS, WOREDA_BUDGETS,
   LOCATION_TYPES, formatBudgetInput, parseBudgetInput,
+  getTownsForRegion, getZonesForRegion,
 } from '@/lib/ethiopia-locations';
 export const EMPTY_PROJECT_FORM = {
   name: '', description: '', status: 'on-track', icon: 'green',
@@ -21,6 +23,19 @@ export default function ProjectFormModal({
   open, form, setForm, users, onSubmit, onClose, submitting, isManager,
 }) {
   const managerUsers = users.filter((u) => ['admin', 'manager', 'project_manager'].includes(u.role));
+  const zoneOptions = useMemo(() => getZonesForRegion(form.region), [form.region]);
+  const townOptions = useMemo(() => getTownsForRegion(form.region), [form.region]);
+
+  const handleRegionChange = (region) => {
+    setForm({
+      ...form,
+      region,
+      zone: '',
+      town: '',
+      woreda: '',
+      kebele: '',
+    });
+  };
 
   const toggleMember = (userId) => {
     const ids = form.memberIds || [];
@@ -83,10 +98,12 @@ export default function ProjectFormModal({
             <div className="form-field"><label>Start Date *</label><input type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div>
             <div className="form-field"><label>End Date *</label><input type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></div>
             <div className="form-field">
-              <label>Icon Color</label>
+              <label>Project Icon</label>
               <select value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })}>
-                <option value="green">Green</option><option value="blue">Blue</option>
-                <option value="amber">Amber</option><option value="red">Red</option>
+                <option value="green">Program</option>
+                <option value="blue">Community</option>
+                <option value="amber">Impact</option>
+                <option value="red">Priority</option>
               </select>
             </div>
           </div>
@@ -135,9 +152,9 @@ export default function ProjectFormModal({
             </div>
           </div>
           <div className="form-row form-row-3">
-            <AutocompleteInput label="Region" value={form.region} onChange={(v) => setForm({ ...form, region: v })} options={REGIONS} placeholder="e.g. Addis Ababa" />
-            <AutocompleteInput label="Zone" value={form.zone} onChange={(v) => setForm({ ...form, zone: v })} options={ZONES} placeholder="e.g. East Shewa" />
-            <AutocompleteInput label="Town / City" value={form.town} onChange={(v) => setForm({ ...form, town: v })} options={TOWNS} placeholder="e.g. Adama" />
+            <AutocompleteInput label="Region" value={form.region} onChange={handleRegionChange} options={REGIONS} placeholder="e.g. Oromia" />
+            <AutocompleteInput label="Zone" value={form.zone} onChange={(v) => setForm({ ...form, zone: v })} options={zoneOptions} placeholder="e.g. East Shewa" disabled={!form.region} />
+            <AutocompleteInput label="Town / City" value={form.town} onChange={(v) => setForm({ ...form, town: v })} options={townOptions} placeholder="e.g. Adama" disabled={!form.region} />
           </div>
           <div className="form-row form-row-3">
             <AutocompleteInput label="Woreda" value={form.woreda} onChange={(v) => setForm({ ...form, woreda: v })} onSelect={handleWoredaSelect} options={WOREDAS} placeholder="e.g. Bole" />
