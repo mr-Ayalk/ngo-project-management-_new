@@ -5505,3 +5505,307 @@ canvas {
   border-color: var(--border);
 }
 .dark .btn-secondary:hover { background: #475569; }
+
+/* ── Sidebar report navigation ── */
+.nav-group { margin-bottom: 4px; }
+.nav-group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  text-align: left;
+}
+.nav-group-toggle:hover,
+.nav-group.active-group .nav-group-toggle { background: rgba(59, 130, 246, 0.08); color: var(--blue); }
+.nav-group-toggle svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-group-chevron { margin-left: auto; width: 14px !important; height: 14px !important; transition: transform 0.15s; }
+.nav-group.open .nav-group-chevron { transform: rotate(180deg); }
+.nav-sub-list { padding: 4px 0 8px 28px; display: flex; flex-direction: column; gap: 2px; }
+.nav-sub-item {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--gray-500);
+  cursor: pointer;
+}
+.nav-sub-item:hover { background: var(--gray-100); color: var(--gray-800); }
+.nav-sub-item.active { background: rgba(59, 130, 246, 0.12); color: var(--blue); font-weight: 600; }
+
+/* ── NGO Report Management ── */
+.ngo-reports-page { max-width: 1200px; }
+.ngo-reports-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+.ngo-reports-hero-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ngo-reports-hero-icon.approval { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+.ngo-reports-hero-icon svg { width: 28px; height: 28px; }
+.ngo-reports-hero-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin: 0 0 4px;
+}
+.ngo-reports-hero h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; color: var(--gray-900); }
+.ngo-reports-hero-desc { margin: 0; font-size: 14px; color: var(--gray-500); max-width: 560px; }
+.ngo-reports-create-btn { margin-left: auto; align-self: center; flex-shrink: 0; }
+.ngo-reports-approval-count {
+  margin-left: auto;
+  text-align: center;
+  padding: 12px 20px;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+}
+.ngo-reports-approval-count span { display: block; font-size: 28px; font-weight: 700; color: var(--blue); }
+.ngo-reports-approval-count label { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.ngo-reports-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.ngo-reports-stat {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.ngo-reports-stat span { display: block; font-size: 24px; font-weight: 700; color: var(--gray-900); }
+.ngo-reports-stat label { font-size: 12px; color: var(--gray-500); }
+.ngo-reports-stat.pending span { color: #d97706; }
+.ngo-reports-stat.approved span { color: #16a34a; }
+.ngo-reports-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.ngo-reports-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.ngo-reports-filter {
+  padding: 7px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  color: var(--gray-600);
+  cursor: pointer;
+}
+.ngo-reports-filter.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.ngo-reports-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: #fff;
+  min-width: 220px;
+}
+.ngo-reports-search svg { width: 16px; height: 16px; color: var(--gray-400); }
+.ngo-reports-search input { border: none; outline: none; font-size: 13px; width: 100%; background: transparent; }
+.ngo-reports-table {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ngo-reports-table-head,
+.ngo-reports-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1fr 1.2fr 0.9fr 80px;
+  gap: 12px;
+  padding: 14px 18px;
+  align-items: center;
+}
+.ngo-reports-table-head {
+  background: var(--gray-50);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  border-bottom: 1px solid var(--gray-200);
+}
+.ngo-reports-table-row {
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ngo-reports-table-row:hover { background: rgba(59, 130, 246, 0.04); }
+.ngo-reports-table-row:last-child { border-bottom: none; }
+.ngo-reports-title-cell { display: flex; align-items: flex-start; gap: 10px; }
+.ngo-reports-title-cell strong { display: block; color: var(--gray-900); }
+.ngo-reports-title-cell small { display: block; font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+.ngo-reports-row-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--gray-100);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ngo-reports-row-icon svg { width: 16px; height: 16px; }
+.ngo-report-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ngo-report-status.status-draft { background: var(--gray-100); color: var(--gray-600); }
+.ngo-report-status.status-submitted,
+.ngo-report-status.status-pending_approval { background: #fef3c7; color: #b45309; }
+.ngo-report-status.status-approved { background: #dcfce7; color: #15803d; }
+.ngo-report-status.status-rejected { background: #fee2e2; color: #b91c1c; }
+.ngo-report-status.status-revision_requested { background: #ffedd5; color: #c2410c; }
+.ngo-reports-empty {
+  text-align: center;
+  padding: 48px 24px;
+  background: #fff;
+  border: 1px dashed var(--gray-300);
+  border-radius: 14px;
+}
+.ngo-reports-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+  background: var(--gray-100);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ngo-reports-empty-icon svg { width: 32px; height: 32px; }
+.ngo-reports-empty h3 { margin: 0 0 8px; }
+.ngo-reports-empty p { color: var(--gray-500); margin: 0 0 20px; max-width: 420px; margin-left: auto; margin-right: auto; }
+.ngo-reports-delete {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ngo-reports-delete:hover { color: #ef4444; }
+.ngo-reports-approval-list { display: flex; flex-direction: column; gap: 14px; }
+.ngo-reports-approval-card {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  padding: 20px;
+}
+.ngo-reports-approval-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.ngo-reports-approval-card-head h3 { margin: 0 0 4px; font-size: 17px; }
+.ngo-reports-approval-card-head p { margin: 0; font-size: 13px; color: var(--gray-500); }
+.ngo-reports-approval-card-head .ngo-report-status { margin-left: auto; flex-shrink: 0; }
+.ngo-reports-approval-preview {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gray-600);
+  margin: 0 0 12px;
+}
+.ngo-reports-approval-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-bottom: 16px;
+}
+.ngo-reports-approval-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-danger-outline {
+  background: #fff;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-danger-outline:hover { background: #fef2f2; }
+.ngo-report-view-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.ngo-report-rejection-note {
+  padding: 12px 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #9a3412;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .ngo-reports-stats { grid-template-columns: 1fr 1fr; }
+  .ngo-reports-hero { flex-direction: column; }
+  .ngo-reports-create-btn,
+  .ngo-reports-approval-count { margin-left: 0; align-self: stretch; }
+  .ngo-reports-table-head { display: none; }
+  .ngo-reports-table-row { grid-template-columns: 1fr; gap: 6px; }
+}
+
+.dark .ngo-reports-hero,
+.dark .ngo-reports-stat,
+.dark .ngo-reports-table,
+.dark .ngo-reports-approval-card,
+.dark .ngo-reports-empty {
+  background: var(--panel);
+  border-color: var(--border);
+}
+.dark .ngo-reports-hero h1,
+.dark .ngo-reports-stat span,
+.dark .ngo-reports-title-cell strong { color: #e2e8f0; }
+.dark .nav-sub-item:hover { background: rgba(255,255,255,0.05); }
+.dark .nav-group-toggle:hover { background: rgba(59,130,246,0.12); }
+

@@ -36,6 +36,8 @@ model User {
   pinnedProjects   PinnedProject[]
   taskComments     TaskComment[]   @relation("CommentSender")
   taskDeliverables TaskDeliverable[] @relation("TaskDeliverableCreator")
+  submittedReports Report[]        @relation("ReportSubmitter")
+  approvedReports  Report[]        @relation("ReportApprover")
 }
 
 model Organization {
@@ -101,6 +103,7 @@ model Project {
   pinnedBy             PinnedProject[]
   comments             TaskComment[]
   tasks                Task[]
+  reports              Report[]
 }
 
 model ProjectMember {
@@ -239,15 +242,35 @@ model Partner {
 }
 
 model Report {
-  id          String   @id @default(cuid())
-  name        String
-  description String?  @db.Text
-  reportDate  DateTime
-  fileUrl     String?
-  fileName    String?
-  fileType    String?
-  fileSize    String?
-  createdAt   DateTime @default(now())
+  id               String    @id @default(cuid())
+  name             String
+  type             String    @default("monthly")
+  status           String    @default("approved")
+  description      String?   @db.Text
+  content          String?   @db.Text
+  reportDate       DateTime
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  projectId        String?
+  submittedById    String?
+  approvedById     String?
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  rejectionReason  String?   @db.Text
+  reviewerNotes    String?   @db.Text
+  incidentSeverity String?
+  incidentLocation String?
+  actionsTaken     String?   @db.Text
+  fileUrl          String?
+  fileName         String?
+  fileType         String?
+  fileSize         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+  project          Project?  @relation(fields: [projectId], references: [id])
+  submittedBy      User?     @relation("ReportSubmitter", fields: [submittedById], references: [id])
+  approvedBy       User?     @relation("ReportApprover", fields: [approvedById], references: [id])
 }
 
 model CalendarEvent {

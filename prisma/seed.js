@@ -380,16 +380,26 @@ async function main() {
   }
 
   const reports = [
-    { name: 'Project Progress Report', description: 'Overview of all active project milestones and deliverables', reportDate: '2024-05-01' },
-    { name: 'Financial Report', description: 'Detailed breakdown of income, expenses, and budget utilization', reportDate: '2024-04-30' },
-    { name: 'Beneficiary Report', description: 'Feedback and satisfaction scores from recent survey', reportDate: '2024-04-28' },
-    { name: 'Impact Report', description: 'Comprehensive overview of project outcomes and beneficiary impact metrics', reportDate: '2024-04-20' },
-    { name: 'Quarterly Impact Report', description: 'Comprehensive overview of project outcomes and beneficiary impact metrics', reportDate: '2024-04-25' },
-    { name: 'Risk & Mitigation Analysis', description: 'Identified risks, mitigation strategies, monitoring plan for Q2 2024', reportDate: '2024-04-10' },
+    { name: 'Daily Field Activity Log — May 24', type: 'daily', status: 'approved', description: 'Community outreach and beneficiary registration activities', content: 'Conducted door-to-door assessments in Addis Ketema woreda.', reportDate: '2024-05-24' },
+    { name: 'Weekly Program Summary — Week 21', type: 'weekly', status: 'approved', description: 'Weekly milestones across health and education programs', reportDate: '2024-05-20' },
+    { name: 'Monthly Operations Report — April 2024', type: 'monthly', status: 'approved', description: 'Monthly operational summary and budget utilization', reportDate: '2024-04-30' },
+    { name: 'Q1 Quarterly Impact Report', type: 'quarterly', status: 'approved', description: 'Quarterly donor report on outcomes and beneficiary reach', reportDate: '2024-04-25' },
+    { name: 'Mid-Year Biannual Review 2024', type: 'biannual', status: 'pending_approval', description: 'Six-month strategic review for board presentation', reportDate: '2024-05-15' },
+    { name: 'Annual Impact Report 2023', type: 'annual', status: 'approved', description: 'Full-year organizational impact and financial summary', reportDate: '2024-01-31' },
+    { name: 'Security Incident — Field Office Access', type: 'incident', status: 'pending_approval', description: 'Minor security incident at regional field office', incidentSeverity: 'medium', incidentLocation: 'Bahir Dar Field Office', actionsTaken: 'Incident logged, local authorities notified, staff debriefed.', reportDate: '2024-05-10' },
   ];
 
   for (const r of reports) {
-    await prisma.report.create({ data: { ...r, reportDate: new Date(r.reportDate) } });
+    await prisma.report.create({
+      data: {
+        ...r,
+        reportDate: new Date(r.reportDate),
+        submittedById: users[0].id,
+        submittedAt: r.status !== 'draft' ? new Date(r.reportDate) : null,
+        approvedAt: r.status === 'approved' ? new Date(r.reportDate) : null,
+        approvedById: r.status === 'approved' ? users[0].id : null,
+      },
+    });
   }
 
   const calendarEvents = [

@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [topbarSearch, setTopbarSearch] = useState('');
   const [pinnedProjects, setPinnedProjects] = useState([]);
   const [pendingNav, setPendingNav] = useState(null);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
   const loadPins = useCallback(async () => {
     try {
@@ -28,6 +29,15 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadPendingApprovals = useCallback(async () => {
+    try {
+      const data = await api.reportsPendingCount();
+      setPendingApprovalCount(data.count || 0);
+    } catch {
+      setPendingApprovalCount(0);
+    }
+  }, []);
+
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/login');
@@ -35,8 +45,11 @@ export default function DashboardPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (user) loadPins();
-  }, [user, loadPins]);
+    if (user) {
+      loadPins();
+      loadPendingApprovals();
+    }
+  }, [user, loadPins, loadPendingApprovals]);
 
   const handlePageChange = (page) => {
     setTopbarSearch('');
@@ -59,6 +72,10 @@ export default function DashboardPage() {
   };
 
   const handleOpenNotification = (notif) => {
+    if (notif.linkType === 'reports_approval' || notif.type === 'report_approval') {
+      setCurrentPage('reports-approval');
+      return;
+    }
     if (notif.projectId) {
       setCurrentPage('messages');
       setPendingNav({
@@ -92,6 +109,7 @@ export default function DashboardPage() {
         onClose={() => setSidebarOpen(false)}
         pinnedProjects={pinnedProjects}
         onOpenProject={handleOpenPinnedProject}
+        pendingApprovalCount={pendingApprovalCount}
       />
       <div className="main-container">
         <Topbar
@@ -118,6 +136,7 @@ export default function DashboardPage() {
           onPinsChange={loadPins}
           pendingNav={pendingNav}
           onPendingNavHandled={() => setPendingNav(null)}
+          onReportsChange={loadPendingApprovals}
         />
       </div>
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}

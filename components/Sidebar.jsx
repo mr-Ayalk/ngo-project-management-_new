@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
+import { REPORT_TYPES } from '@/lib/report-types';
 import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({
@@ -12,9 +14,10 @@ const Sidebar = ({
   pinnedProjects = [],
   onOpenProject,
   myTaskCount = 0,
-  isAdmin = false,
+  pendingApprovalCount = 0,
 }) => {
   const { logout } = useAuth();
+  const [reportsExpanded, setReportsExpanded] = useState(true);
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -24,13 +27,14 @@ const Sidebar = ({
   ];
 
   const manageNav = [
-    { id: 'reports', label: 'Reports', icon: 'reports' },
     { id: 'partners', label: 'Partners', icon: 'partners' },
     { id: 'beneficiaries', label: 'Beneficiaries', icon: 'beneficiaries' },
     { id: 'documents', label: 'Documents', icon: 'documents' },
     { id: 'logistics', label: 'Logistics', icon: 'logistics' },
     { id: 'messages', label: 'Inbox', icon: 'messages' },
   ];
+
+  const isReportPage = (id) => id === currentPage || (id === 'reports-overview' && currentPage === 'reports');
 
   const renderIcon = (type) => {
     const icons = {
@@ -66,8 +70,11 @@ const Sidebar = ({
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      ),
+      approval: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
         </svg>
       ),
       partners: (
@@ -131,6 +138,8 @@ const Sidebar = ({
     </div>
   );
 
+  const reportGroupActive = currentPage.startsWith('reports-') || currentPage === 'reports';
+
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
       <div className="sidebar-header">
@@ -145,6 +154,57 @@ const Sidebar = ({
         <nav className="nav">
           <div className="nav-section-label">Overview</div>
           {mainNav.map(renderNavItem)}
+
+          <div className="nav-section-label">Reports</div>
+          <div className={`nav-group${reportsExpanded ? ' open' : ''}${reportGroupActive ? ' active-group' : ''}`}>
+            <button
+              type="button"
+              className="nav-group-toggle"
+              onClick={() => setReportsExpanded((v) => !v)}
+              aria-expanded={reportsExpanded}
+            >
+              {renderIcon('reports')}
+              <span>Report Management</span>
+              <svg className="nav-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {reportsExpanded && (
+              <div className="nav-sub-list">
+                <button
+                  type="button"
+                  className={`nav-sub-item${isReportPage('reports-overview') ? ' active' : ''}`}
+                  onClick={() => onPageChange('reports-overview')}
+                >
+                  Overview &amp; Analytics
+                </button>
+                {REPORT_TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    className={`nav-sub-item${currentPage === `reports-${t.value}` ? ' active' : ''}`}
+                    onClick={() => onPageChange(`reports-${t.value}`)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`nav-item${currentPage === 'reports-approval' ? ' active' : ''}`}
+            onClick={() => onPageChange('reports-approval')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('reports-approval')}
+          >
+            {renderIcon('approval')}
+            Reports Approval
+            {pendingApprovalCount > 0 && (
+              <span className="nav-badge">{pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}</span>
+            )}
+          </div>
 
           <div className="nav-section-label">Manage</div>
           {manageNav.map(renderNavItem)}

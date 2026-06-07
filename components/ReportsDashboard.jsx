@@ -297,6 +297,9 @@ export default function ReportsDashboard({
                     </div>
                     <h3>{report.name}</h3>
                     <p className="reports-manual-date">{report.date}</p>
+                    {report.statusLabel && (
+                      <span className={`ngo-report-status status-${report.status}`}>{report.statusLabel}</span>
+                    )}
                     {report.description && (
                       <p className="reports-manual-preview">
                         {report.description.length > 100 ? `${report.description.slice(0, 100)}…` : report.description}

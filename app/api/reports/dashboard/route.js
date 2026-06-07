@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, formatDate, formatCurrency, requireAuth } from '@/lib/api-utils';
+import { formatReport, REPORT_INCLUDE } from '@/lib/reports';
 
 function statusLabel(status) {
   const map = {
@@ -35,7 +36,7 @@ export async function GET(req) {
         orderBy: { name: 'asc' },
       }),
       prisma.organization.findFirst(),
-      prisma.report.findMany({ orderBy: { reportDate: 'desc' } }),
+      prisma.report.findMany({ include: REPORT_INCLUDE, orderBy: { reportDate: 'desc' } }),
       prisma.beneficiaryProject.groupBy({
         by: ['projectId'],
         _count: { beneficiaryId: true },
@@ -134,17 +135,7 @@ export async function GET(req) {
       budgetVsActuals,
       impactKpis,
       globalKpis,
-      manualReports: manualReports.map((r) => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        date: formatDate(r.reportDate),
-        reportDate: r.reportDate,
-        fileUrl: r.fileUrl,
-        fileName: r.fileName,
-        fileType: r.fileType,
-        fileSize: r.fileSize,
-      })),
+      manualReports: manualReports.map(formatReport),
     });
   } catch (err) {
     console.error('Reports dashboard error:', err);

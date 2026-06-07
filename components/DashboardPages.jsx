@@ -11,6 +11,9 @@ import DocumentsLibrary from '@/components/DocumentsLibrary';
 import LogisticsPage from '@/components/LogisticsPage';
 import ProfileSettings from '@/components/ProfileSettings';
 import ReportsDashboard from '@/components/ReportsDashboard';
+import ReportsManagement from '@/components/ReportsManagement';
+import ReportsApproval from '@/components/ReportsApproval';
+import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
@@ -35,7 +38,19 @@ const EMPTY_EXPENSE = { projectId: '', amount: '', category: 'operations' };
 const EMPTY_BENEFICIARY = { name: '', email: '', program: '', region: '', status: 'active' };
 const EMPTY_DOCUMENT = { name: '', category: 'reports', projectId: '', fileType: 'PDF', size: '1 MB' };
 const EMPTY_PARTNER = { name: '', type: 'Donor', description: '', email: '', phone: '', contact: '' };
-const EMPTY_REPORT = { name: '', description: '', reportDate: new Date().toISOString().slice(0, 10) };
+const EMPTY_REPORT = {
+  name: '',
+  type: 'monthly',
+  description: '',
+  content: '',
+  reportDate: new Date().toISOString().slice(0, 10),
+  periodStart: '',
+  periodEnd: '',
+  projectId: '',
+  incidentSeverity: '',
+  incidentLocation: '',
+  actionsTaken: '',
+};
 
 const KANBAN_COLS = [
   { key: 'todo', label: 'To Do' },
@@ -95,6 +110,7 @@ const DashboardPages = ({
   topbarSearch = '',
   onTopbarSearchSync,
   pinnedProjects = [], onPinsChange, pendingNav, onPendingNavHandled,
+  onReportsChange,
 }) => {
   const { user } = useAuth();
   const isManager = isProjectManager(user);
@@ -112,6 +128,7 @@ const DashboardPages = ({
   const [calendar, setCalendar] = useState(null);
   const [budget, setBudget] = useState(null);
   const [reportsDashboard, setReportsDashboard] = useState(null);
+  const [typedReports, setTypedReports] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docSearch, setDocSearch] = useState('');
@@ -166,6 +183,7 @@ const DashboardPages = ({
   const [reportFile, setReportFile] = useState(null);
   const reportFileInputRef = useRef(null);
   const [viewReport, setViewReport] = useState(null);
+  const [rejectForm, setRejectForm] = useState({ reportId: null, reason: '', requestRevision: true });
   const [viewDocument, setViewDocument] = useState(null);
   const [editUser, setEditUser] = useState(null);
   const [draggedTask, setDraggedTask] = useState(null);
@@ -222,8 +240,23 @@ const DashboardPages = ({
           setBudget(await api.budget());
           break;
         case 'reports':
+        case 'reports-overview':
           setReportsDashboard(await api.reportsDashboard());
           break;
+        case 'reports-approval':
+          setTypedReports(await api.reports({ pending: 'true' }));
+          break;
+        case 'reports-daily':
+        case 'reports-weekly':
+        case 'reports-monthly':
+        case 'reports-quarterly':
+        case 'reports-biannual':
+        case 'reports-annual':
+        case 'reports-incident': {
+          const rt = reportTypeFromPageId(currentPage);
+          if (rt) setTypedReports(await api.reports({ type: rt }));
+          break;
+        }
         case 'beneficiaries': {
           const params = {};
           if (beneRegion !== 'all') params.region = beneRegion;
@@ -803,7 +836,7 @@ const DashboardPages = ({
     }
   };
 
-  const handleSaveReport = async (e) => {
+  const handleSaveReport = async (e, submitForApproval = false) => {
     e.preventDefault();
     setSubmitting(true);
     try {
@@ -817,15 +850,84 @@ const DashboardPages = ({
           fileSize: uploaded.size,
         };
       }
-      await api.createReport({ ...reportForm, ...fileData });
-      showToast('Report created');
+      const payload = { ...reportForm, ...fileData, submit: submitForApproval };
+      if (reportForm.id) {
+        await api.updateReport(reportForm.id, payload);
+        if (submitForApproval) await api.submitReport(reportForm.id);
+        showToast(submitForApproval ? 'Report submitted for approval' : 'Report updated');
+      } else {
+        await api.createReport(payload);
+        showToast(submitForApproval ? 'Report submitted for approval' : 'Report saved as draft');
+      }
       closeModal();
       loadPageData();
+      onReportsChange?.();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmitReport = async (reportId) => {
+    setSubmitting(true);
+    try {
+      await api.submitReport(reportId);
+      showToast('Report submitted for approval');
+      closeModal();
+      loadPageData();
+      onReportsChange?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveReport = async (report) => {
+    setSubmitting(true);
+    try {
+      await api.approveReport(report.id, {});
+      showToast('Report approved');
+      closeModal();
+      loadPageData();
+      onReportsChange?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectReport = async (e) => {
+    e.preventDefault();
+    if (!rejectForm.reason.trim()) {
+      showToast('Please provide a reason', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.rejectReport(rejectForm.reportId, {
+        reason: rejectForm.reason,
+        requestRevision: rejectForm.requestRevision,
+      });
+      showToast('Report returned to author');
+      setRejectForm({ reportId: null, reason: '', requestRevision: true });
+      setModal(null);
+      closeModal();
+      loadPageData();
+      onReportsChange?.();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openCreateReport = (type) => {
+    setReportForm({ ...EMPTY_REPORT, type, reportDate: new Date().toISOString().slice(0, 10) });
+    setReportFile(null);
+    setModal('report');
   };
 
   const handleReportFileSelect = (file) => {
@@ -1400,14 +1502,39 @@ const DashboardPages = ({
       )}
 
       {/* ── REPORTS ── */}
-      {currentPage === 'reports' && (
+      {(currentPage === 'reports' || currentPage === 'reports-overview') && (
         <ReportsDashboard
           data={reportsDashboard}
           loading={loading && !reportsDashboard}
           isManager={isManager}
-          onAddManualReport={() => { setReportForm(EMPTY_REPORT); setReportFile(null); setModal('report'); }}
+          onAddManualReport={() => openCreateReport('monthly')}
           onOpenReport={openReportDetail}
           onDeleteReport={handleDeleteReport}
+        />
+      )}
+
+      {reportTypeFromPageId(currentPage) && (
+        <ReportsManagement
+          reportType={reportTypeFromPageId(currentPage)}
+          reports={typedReports}
+          loading={loading && !typedReports.length}
+          isManager={isManager}
+          onCreateReport={() => openCreateReport(reportTypeFromPageId(currentPage))}
+          onOpenReport={openReportDetail}
+          onDeleteReport={handleDeleteReport}
+        />
+      )}
+
+      {currentPage === 'reports-approval' && (
+        <ReportsApproval
+          reports={typedReports}
+          loading={loading && !typedReports.length}
+          onOpenReport={openReportDetail}
+          onApprove={handleApproveReport}
+          onReject={(report) => {
+            setRejectForm({ reportId: report.id, reason: '', requestRevision: true });
+            setModal('reportReject');
+          }}
         />
       )}
 
@@ -1819,55 +1946,124 @@ const DashboardPages = ({
         </form>
       </Modal>
 
-      <Modal open={modal === 'report'} title="Add Manual Report" onClose={closeModal}>
-        <form onSubmit={handleSaveReport}>
-          <div className="form-field"><label>Name *</label><input required value={reportForm.name} onChange={(e) => setReportForm({ ...reportForm, name: e.target.value })} /></div>
-          <div className="form-field"><label>Description</label><textarea rows={8} value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} placeholder="Write a detailed report summary, findings, recommendations…" /></div>
-          <div className="form-field"><label>Date</label><input type="date" value={reportForm.reportDate} onChange={(e) => setReportForm({ ...reportForm, reportDate: e.target.value })} /></div>
+      <Modal open={modal === 'report'} title={reportForm.id ? 'Edit Report' : `New ${getReportTypeMeta(reportForm.type).shortLabel} Report`} onClose={closeModal} width={760}>
+        <form onSubmit={(e) => handleSaveReport(e, false)}>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Report Title *</label>
+              <input required value={reportForm.name} onChange={(e) => setReportForm({ ...reportForm, name: e.target.value })} />
+            </div>
+            <div className="form-field">
+              <label>Report Type</label>
+              <select value={reportForm.type} onChange={(e) => setReportForm({ ...reportForm, type: e.target.value })}>
+                {['daily', 'weekly', 'monthly', 'quarterly', 'biannual', 'annual', 'incident'].map((t) => (
+                  <option key={t} value={t}>{getReportTypeMeta(t).label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Project (optional)</label>
+              <select value={reportForm.projectId} onChange={(e) => setReportForm({ ...reportForm, projectId: e.target.value })}>
+                <option value="">Organization-wide</option>
+                {lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Report Date</label>
+              <input type="date" value={reportForm.reportDate} onChange={(e) => setReportForm({ ...reportForm, reportDate: e.target.value })} />
+            </div>
+          </div>
+          {reportForm.type !== 'incident' && (
+            <div className="form-row">
+              <div className="form-field">
+                <label>Period Start</label>
+                <input type="date" value={reportForm.periodStart} onChange={(e) => setReportForm({ ...reportForm, periodStart: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Period End</label>
+                <input type="date" value={reportForm.periodEnd} onChange={(e) => setReportForm({ ...reportForm, periodEnd: e.target.value })} />
+              </div>
+            </div>
+          )}
+          {reportForm.type === 'incident' && (
+            <div className="form-row">
+              <div className="form-field">
+                <label>Severity</label>
+                <select value={reportForm.incidentSeverity} onChange={(e) => setReportForm({ ...reportForm, incidentSeverity: e.target.value })}>
+                  <option value="">Select severity…</option>
+                  {INCIDENT_SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Location</label>
+                <input value={reportForm.incidentLocation} onChange={(e) => setReportForm({ ...reportForm, incidentLocation: e.target.value })} placeholder="Site, region, or facility" />
+              </div>
+            </div>
+          )}
+          <div className="form-field">
+            <label>Executive Summary</label>
+            <textarea rows={3} value={reportForm.description} onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })} placeholder="Brief overview for reviewers and leadership…" />
+          </div>
+          <div className="form-field">
+            <label>{reportForm.type === 'incident' ? 'Incident Details & Response' : 'Activities, Outcomes & Narrative'}</label>
+            <textarea rows={6} value={reportForm.content} onChange={(e) => setReportForm({ ...reportForm, content: e.target.value })} placeholder="Document activities, challenges, outcomes, lessons learned, and next steps…" />
+          </div>
+          {reportForm.type === 'incident' && (
+            <div className="form-field">
+              <label>Actions Taken</label>
+              <textarea rows={3} value={reportForm.actionsTaken} onChange={(e) => setReportForm({ ...reportForm, actionsTaken: e.target.value })} placeholder="Immediate actions, referrals, follow-up plan…" />
+            </div>
+          )}
           <div className="form-field">
             <label>Attach File (optional)</label>
-            <input
-              ref={reportFileInputRef}
-              type="file"
-              className="file-input-hidden"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.png,.jpg,.jpeg"
-              onChange={(e) => handleReportFileSelect(e.target.files?.[0])}
-            />
-            <div
-              className={`file-drop-zone${reportFile ? ' has-file' : ''}`}
-              onClick={() => reportFileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
-              onDragLeave={(e) => e.currentTarget.classList.remove('drag-over')}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.currentTarget.classList.remove('drag-over');
-                handleReportFileSelect(e.dataTransfer.files?.[0]);
-              }}
-            >
-              <div className="file-drop-icon">📄</div>
+            <input ref={reportFileInputRef} type="file" className="file-input-hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.png,.jpg,.jpeg" onChange={(e) => handleReportFileSelect(e.target.files?.[0])} />
+            <div className={`file-drop-zone${reportFile ? ' has-file' : ''}`} onClick={() => reportFileInputRef.current?.click()}>
               {reportFile ? (
                 <div className="file-drop-selected">
                   <span className="file-drop-name">{reportFile.name}</span>
                   <button type="button" className="file-drop-remove" onClick={(e) => { e.stopPropagation(); setReportFile(null); if (reportFileInputRef.current) reportFileInputRef.current.value = ''; }}>Remove</button>
                 </div>
               ) : (
-                <p className="file-drop-hint">Click or drag a file here (PDF, DOCX, XLSX, CSV, images)</p>
+                <p className="file-drop-hint">Click to attach supporting documents (PDF, DOCX, XLSX, images)</p>
               )}
             </div>
           </div>
-          <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Create Report</button></div>
+          <div className="form-actions">
+            <button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button>
+            <button type="submit" className="btn-secondary" disabled={submitting}>Save Draft</button>
+            <button type="button" className="btn-primary" disabled={submitting} onClick={(e) => handleSaveReport(e, true)}>Submit for Approval</button>
+          </div>
         </form>
       </Modal>
 
-      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal} width={680}>
+      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal} width={760}>
         {viewReport && (<>
-          <p className="detail-meta report-detail-date">{viewReport.date}</p>
-          <div className="report-detail-body">
-            <h4 className="report-detail-heading">Report Description</h4>
-            <div className="report-detail-content">
-              {viewReport.description || 'No description provided.'}
-            </div>
+          <div className="ngo-report-view-meta">
+            <span className={`ngo-report-status status-${viewReport.status}`}>{viewReport.statusLabel || viewReport.status}</span>
+            <span>{viewReport.typeLabel || viewReport.type}</span>
+            <span>{viewReport.date}</span>
+            {viewReport.project?.name && <span>Project: {viewReport.project.name}</span>}
           </div>
+          {viewReport.periodLabel && <p className="detail-meta">Reporting period: {viewReport.periodLabel}</p>}
+          {viewReport.submittedBy && <p className="detail-meta">Submitted by: {viewReport.submittedBy.name}</p>}
+          {viewReport.incidentSeverity && <p className="detail-meta">Severity: {viewReport.incidentSeverity} · Location: {viewReport.incidentLocation || '—'}</p>}
+          <div className="report-detail-body">
+            <h4 className="report-detail-heading">Executive Summary</h4>
+            <div className="report-detail-content">{viewReport.description || 'No summary provided.'}</div>
+          </div>
+          {(viewReport.content || viewReport.actionsTaken) && (
+            <div className="report-detail-body">
+              <h4 className="report-detail-heading">{viewReport.type === 'incident' ? 'Incident Details' : 'Report Content'}</h4>
+              <div className="report-detail-content">{viewReport.content || viewReport.actionsTaken}</div>
+            </div>
+          )}
+          {viewReport.rejectionReason && (
+            <div className="ngo-report-rejection-note">
+              <strong>Reviewer feedback:</strong> {viewReport.rejectionReason}
+            </div>
+          )}
           {viewReport.fileName && (
             <p className="detail-meta report-attachment">
               <strong>Attachment:</strong> {viewReport.fileName} {viewReport.fileSize ? `(${viewReport.fileSize})` : ''}
@@ -1876,9 +2072,32 @@ const DashboardPages = ({
           <div className="report-actions">
             <button type="button" onClick={() => downloadReport(viewReport)}>Download{viewReport.fileUrl ? ' File' : ''}</button>
             <button type="button" onClick={() => shareReport(viewReport)}>Share</button>
-            {isManager && <button type="button" className="danger-text" onClick={() => handleDeleteReport(viewReport.id)}>Delete Report</button>}
+            {['draft', 'revision_requested', 'rejected'].includes(viewReport.status) && (
+              <button type="button" className="btn-primary" onClick={() => handleSubmitReport(viewReport.id)} disabled={submitting}>Submit for Approval</button>
+            )}
+            {isManager && ['submitted', 'pending_approval'].includes(viewReport.status) && (
+              <>
+                <button type="button" className="btn-primary" onClick={() => handleApproveReport(viewReport)} disabled={submitting}>Approve</button>
+                <button type="button" className="btn-danger-outline" onClick={() => { setRejectForm({ reportId: viewReport.id, reason: '', requestRevision: true }); setModal('reportReject'); }} disabled={submitting}>Return for Revision</button>
+              </>
+            )}
+            {isManager && <button type="button" className="danger-text" onClick={() => handleDeleteReport(viewReport.id)}>Delete</button>}
           </div>
         </>)}
+      </Modal>
+
+      <Modal open={modal === 'reportReject'} title="Return Report for Revision" onClose={() => { setModal('reportView'); }} width={520}>
+        <form onSubmit={handleRejectReport}>
+          <p className="profile-settings-hint">Provide clear feedback so the author can revise and resubmit.</p>
+          <div className="form-field">
+            <label>Reason *</label>
+            <textarea required rows={4} value={rejectForm.reason} onChange={(e) => setRejectForm({ ...rejectForm, reason: e.target.value })} placeholder="Explain what needs to be corrected or added…" />
+          </div>
+          <div className="form-actions">
+            <button type="button" className="btn-secondary" onClick={() => setModal('reportView')}>Cancel</button>
+            <button type="submit" className="btn-danger-outline" disabled={submitting}>Return to Author</button>
+          </div>
+        </form>
       </Modal>
 
       <Modal open={modal === 'activities'} title="All Activities" onClose={closeModal} width={560}>
