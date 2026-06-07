@@ -3,6 +3,16 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, formatCurrency, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
 
+function parseJsonArray(value, fallback = []) {
+  if (!value) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function GET(req) {
   try {
     const auth = await requireAuth(req);
@@ -210,6 +220,16 @@ export async function GET(req) {
           : '',
       })),
       budgetOverview,
+      portal: org ? {
+        title: org.landingTitle || org.name,
+        subtitle: org.landingSubtitle || org.description || 'Track impact, manage programs, and serve communities with clarity.',
+        tagline: org.landingTagline || '',
+        mission: org.missionText || '',
+        vision: org.visionText || '',
+        strategicGoals: parseJsonArray(org.strategicGoals, []),
+        primaryColor: org.primaryColor || '#2563eb',
+        accentColor: org.accentColor || '#16a34a',
+      } : null,
     });
   } catch (err) {
     console.error('Dashboard API error:', err);

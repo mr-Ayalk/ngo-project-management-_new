@@ -13,7 +13,9 @@ import ProfileSettings from '@/components/ProfileSettings';
 import ReportsDashboard from '@/components/ReportsDashboard';
 import ReportsManagement from '@/components/ReportsManagement';
 import ReportsApproval from '@/components/ReportsApproval';
+import ConfigurationHub from '@/components/ConfigurationHub';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
+import { isConfigPage } from '@/lib/config-pages';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
@@ -129,6 +131,7 @@ const DashboardPages = ({
   const [budget, setBudget] = useState(null);
   const [reportsDashboard, setReportsDashboard] = useState(null);
   const [typedReports, setTypedReports] = useState([]);
+  const [configData, setConfigData] = useState(null);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docSearch, setDocSearch] = useState('');
@@ -312,6 +315,9 @@ const DashboardPages = ({
           break;
         }
         default:
+          if (isConfigPage(currentPage)) {
+            setConfigData(await api.config());
+          }
           break;
       }
       pageDataLoaded.current[cacheKey] = true;
@@ -930,6 +936,107 @@ const DashboardPages = ({
     setModal('report');
   };
 
+  const handleSaveConfigOrg = async (payload) => {
+    setSubmitting(true);
+    try {
+      await api.updateConfig(payload);
+      showToast('Configuration saved');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateConfigUnit = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createConfigUnit(body);
+      showToast('Unit added');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfigUnit = async (id) => {
+    const ok = await confirmToast('Remove this organizational unit?', { description: 'This cannot be undone.' });
+    if (!ok) return;
+    try {
+      await api.deleteConfigUnit(id);
+      showToast('Unit removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleCreateConfigIndicator = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createConfigIndicator(body);
+      showToast('Indicator added');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfigIndicator = async (id) => {
+    const ok = await confirmToast('Remove this indicator?', { description: 'It will no longer appear in M&E tracking.' });
+    if (!ok) return;
+    try {
+      await api.deleteConfigIndicator(id);
+      showToast('Indicator removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleCreateConfigScope = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.createConfigScope(body);
+      showToast('Staff scope mapping saved');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfigScope = async (id) => {
+    const ok = await confirmToast('Remove this scope mapping?', { description: 'Staff member will lose this field assignment.' });
+    if (!ok) return;
+    try {
+      await api.deleteConfigScope(id);
+      showToast('Mapping removed');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleSaveReportWorkflow = async (body) => {
+    setSubmitting(true);
+    try {
+      await api.saveReportWorkflow(body);
+      showToast('Report workflow updated');
+      loadPageData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleReportFileSelect = (file) => {
     if (!file) return;
     setReportFile(file);
@@ -1081,9 +1188,55 @@ const DashboardPages = ({
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
         <>
-          <div className="page-header">
-            <h1>Dashboard</h1>
-            <p>Welcome back, {firstName}! ✋ Here&apos;s what&apos;s happening with your projects.</p>
+          <div className="portal-topbar">
+            <div>
+              <p className="portal-greeting">Welcome! <strong>{firstName}</strong>,</p>
+              <p className="portal-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            </div>
+          </div>
+
+          {dashboard.portal && (
+            <section className="portal-hero" style={{ '--portal-primary': dashboard.portal.primaryColor || '#2563eb' }}>
+              <div className="portal-hero-inner">
+                <div className="portal-hero-copy">
+                  <h1>{dashboard.portal.title}</h1>
+                  <p className="portal-hero-sub">{dashboard.portal.subtitle}</p>
+                  {dashboard.portal.tagline && <p className="portal-hero-tag">{dashboard.portal.tagline}</p>}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {(dashboard.portal?.mission || dashboard.portal?.vision || (dashboard.portal?.strategicGoals?.length > 0)) && (
+            <div className="portal-info-grid">
+              {dashboard.portal.mission && (
+                <article className="portal-info-card">
+                  <h2>Our Mission</h2>
+                  <p>{dashboard.portal.mission}</p>
+                </article>
+              )}
+              {dashboard.portal.vision && (
+                <article className="portal-info-card">
+                  <h2>Our Vision</h2>
+                  <p>{dashboard.portal.vision}</p>
+                </article>
+              )}
+              {dashboard.portal.strategicGoals?.length > 0 && (
+                <article className="portal-info-card portal-info-goals">
+                  <h2>Our Strategic Goals</h2>
+                  <ul>
+                    {dashboard.portal.strategicGoals.map((goal, i) => (
+                      <li key={i}>{goal}</li>
+                    ))}
+                  </ul>
+                </article>
+              )}
+            </div>
+          )}
+
+          <div className="page-header portal-metrics-header">
+            <h1>Impact Overview</h1>
+            <p>Key metrics and activity across your programs and projects.</p>
           </div>
           <div className="kpi-grid">
             <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('projects')}>
@@ -1535,6 +1688,26 @@ const DashboardPages = ({
             setRejectForm({ reportId: report.id, reason: '', requestRevision: true });
             setModal('reportReject');
           }}
+        />
+      )}
+
+      {isConfigPage(currentPage) && (
+        <ConfigurationHub
+          configPage={currentPage}
+          data={configData}
+          loading={loading && !configData}
+          canEdit={isManager}
+          submitting={submitting}
+          onRefresh={loadPageData}
+          onSaveOrg={handleSaveConfigOrg}
+          onCreateUnit={handleCreateConfigUnit}
+          onDeleteUnit={handleDeleteConfigUnit}
+          onCreateIndicator={handleCreateConfigIndicator}
+          onDeleteIndicator={handleDeleteConfigIndicator}
+          onCreateScope={handleCreateConfigScope}
+          onDeleteScope={handleDeleteConfigScope}
+          onSaveWorkflow={handleSaveReportWorkflow}
+          showToast={showToast}
         />
       )}
 

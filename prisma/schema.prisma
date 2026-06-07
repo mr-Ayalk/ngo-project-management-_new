@@ -38,6 +38,7 @@ model User {
   taskDeliverables TaskDeliverable[] @relation("TaskDeliverableCreator")
   submittedReports Report[]        @relation("ReportSubmitter")
   approvedReports  Report[]        @relation("ReportApprover")
+  scopeMappings    UserScopeMapping[]
 }
 
 model Organization {
@@ -58,7 +59,67 @@ model Organization {
   beneficiariesThisMonth Int      @default(0)
   activePrograms         Int      @default(0)
   completionRate         Int      @default(0)
+  landingTitle           String?
+  landingSubtitle        String?  @db.Text
+  landingTagline         String?
+  missionText            String?  @db.Text
+  visionText             String?  @db.Text
+  strategicGoals         String?  @db.Text
+  primaryColor           String?  @default("#2563eb")
+  accentColor            String?  @default("#16a34a")
+  dashboardLayout        String?  @db.Text
+  enabledRegions         String?  @db.Text
+  koboEnabled            Boolean  @default(false)
+  koboApiUrl             String?
+  koboProjectId          String?
   updatedAt              DateTime @updatedAt
+}
+
+model OrgUnit {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProgramIndicator {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?
+  category    String?
+  unit        String?
+  target      Float?
+  baseline    Float?
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserScopeMapping {
+  id        String   @id @default(cuid())
+  userId    String
+  region    String?
+  zone      String?
+  woreda    String?
+  kebele    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ReportWorkflowRule {
+  id             String  @id @default(cuid())
+  reportType     String  @unique
+  submitterRoles String
+  approverRoles  String
+  isActive       Boolean @default(true)
+  updatedAt      DateTime @updatedAt
 }
 
 model Project {

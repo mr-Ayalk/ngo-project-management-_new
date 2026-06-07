@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { REPORT_TYPES } from '@/lib/report-types';
+import { CONFIG_PAGES, CONFIG_EXTRA } from '@/lib/config-pages';
 import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({
@@ -18,6 +19,7 @@ const Sidebar = ({
 }) => {
   const { logout } = useAuth();
   const [reportsExpanded, setReportsExpanded] = useState(true);
+  const [configExpanded, setConfigExpanded] = useState(true);
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -139,6 +141,22 @@ const Sidebar = ({
   );
 
   const reportGroupActive = currentPage.startsWith('reports-') || currentPage === 'reports';
+  const configGroupActive = currentPage.startsWith('config-');
+
+  const configSubIcon = (pageId) => {
+    const icons = {
+      'config-units': '◫',
+      'config-indicators': '◎',
+      'config-locations': '⌖',
+      'config-reporter-approver': '⇄',
+      'config-user-woreda': '⊞',
+      'config-landing': '⌂',
+      'config-dashboard': '▦',
+      'config-colors': '◑',
+      'config-datetime': '⏲',
+    };
+    return icons[pageId] || '•';
+  };
 
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
@@ -205,6 +223,95 @@ const Sidebar = ({
               <span className="nav-badge">{pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}</span>
             )}
           </div>
+
+          <div className="nav-section-label">M &amp; E</div>
+          <div
+            className={`nav-item${currentPage === 'config-indicators' ? ' active' : ''}`}
+            onClick={() => onPageChange('config-indicators')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('config-indicators')}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            M &amp; E Module
+          </div>
+          <div
+            className={`nav-item${currentPage === 'messages' ? ' active' : ''}`}
+            onClick={() => onPageChange('messages')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('messages')}
+          >
+            {renderIcon('messages')}
+            Notifications
+          </div>
+
+          <div className="nav-section-label">Configurations</div>
+          <div className={`nav-group${configExpanded ? ' open' : ''}${configGroupActive ? ' active-group' : ''}`}>
+            <button
+              type="button"
+              className="nav-group-toggle"
+              onClick={() => setConfigExpanded((v) => !v)}
+              aria-expanded={configExpanded}
+            >
+              {renderIcon('settings')}
+              <span>Configurations</span>
+              <svg className="nav-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {configExpanded && (
+              <div className="nav-sub-list config-sub-list">
+                {CONFIG_PAGES.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    className={`nav-sub-item config-sub-item${currentPage === page.id ? ' active' : ''}`}
+                    onClick={() => onPageChange(page.id)}
+                  >
+                    <span className="config-sub-icon" aria-hidden="true">{configSubIcon(page.id)}</span>
+                    {page.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {CONFIG_EXTRA.filter((p) => p.id === 'config-kobo').map((page) => (
+            <div
+              key={page.id}
+              className={`nav-item${currentPage === page.id ? ' active' : ''}`}
+              onClick={() => onPageChange(page.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onPageChange(page.id)}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                <line x1="12" y1="18" x2="12" y2="18"/>
+              </svg>
+              {page.label}
+            </div>
+          ))}
+
+          <div className="nav-section-label">Guide</div>
+          {CONFIG_EXTRA.filter((p) => p.id === 'config-guide').map((page) => (
+            <div
+              key={page.id}
+              className={`nav-item${currentPage === page.id ? ' active' : ''}`}
+              onClick={() => onPageChange(page.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onPageChange(page.id)}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+              </svg>
+              {page.label}
+            </div>
+          ))}
 
           <div className="nav-section-label">Manage</div>
           {manageNav.map(renderNavItem)}

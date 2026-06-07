@@ -46,6 +46,10 @@ async function main() {
   await prisma.budget.deleteMany();
   await prisma.beneficiaryProject.deleteMany();
   await prisma.beneficiary.deleteMany();
+  await prisma.userScopeMapping.deleteMany();
+  await prisma.reportWorkflowRule.deleteMany();
+  await prisma.programIndicator.deleteMany();
+  await prisma.orgUnit.deleteMany();
   await prisma.task.deleteMany();
   await prisma.project.deleteMany();
   await prisma.organization.deleteMany();
@@ -133,8 +137,58 @@ async function main() {
       dateFormat: 'DD/MM/YYYY',
       timezone: 'Africa/Addis_Ababa',
       fiscalYearStart: 'July',
+      landingTitle: 'Engage Now Africa',
+      landingSubtitle: "Welcome to Engage Now Africa's Impact Portal – a space to track how we heal, rescue, and lift vulnerable individuals, families, and communities across Africa.",
+      landingTagline: 'Empowering Communities Since 2010',
+      missionText: 'To heal, rescue, and lift vulnerable individuals, families, and communities through sustainable development programs in health, education, water, and anti-trafficking initiatives.',
+      visionText: 'A transformed Africa where every community has access to clean water, quality education, dignified livelihoods, and protection from exploitation.',
+      strategicGoals: JSON.stringify([
+        'Increase access to clean water and sanitation in underserved communities',
+        'Expand anti-trafficking awareness and survivor support programs',
+        'Improve literacy and vocational skills for children and youth',
+        'Strengthen local partnerships and community-led development',
+      ]),
+      primaryColor: '#2563eb',
+      accentColor: '#16a34a',
+      enabledRegions: JSON.stringify(['Addis Ababa', 'Amhara', 'Oromia', 'SNNPR', 'Tigray', 'Somali']),
+      dashboardLayout: JSON.stringify(['kpi', 'tasks', 'budget', 'reports', 'beneficiaries', 'calendar']),
+      koboEnabled: false,
+      koboApiUrl: 'https://kf.kobotoolbox.org',
     },
   });
+
+  await Promise.all([
+    prisma.orgUnit.createMany({
+      data: [
+        { name: 'Programs & M&E', code: 'PME', description: 'Monitoring, evaluation, and program quality', sortOrder: 1 },
+        { name: 'Field Operations', code: 'FIELD', description: 'Community outreach and woreda-level activities', sortOrder: 2 },
+        { name: 'Finance & Compliance', code: 'FIN', description: 'Budgeting, grants, and donor reporting', sortOrder: 3 },
+        { name: 'Humanitarian Response', code: 'HR', description: 'Emergency relief and incident response', sortOrder: 4 },
+      ],
+    }),
+    prisma.programIndicator.createMany({
+      data: [
+        { name: 'Beneficiaries Reached', code: 'BEN-001', category: 'Impact', unit: 'people', target: 5000, baseline: 4670 },
+        { name: 'Water Points Functional', code: 'WAT-001', category: 'Output', unit: 'sites', target: 120, baseline: 98 },
+        { name: 'Literacy Program Completion', code: 'EDU-001', category: 'Outcome', unit: '%', target: 85, baseline: 72 },
+        { name: 'Reports Submitted On Time', code: 'REP-001', category: 'Process', unit: '%', target: 95, baseline: 88 },
+      ],
+    }),
+    prisma.reportWorkflowRule.createMany({
+      data: [
+        { reportType: 'daily', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'admin,manager,project_manager' },
+        { reportType: 'weekly', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'admin,manager,project_manager' },
+        { reportType: 'monthly', submitterRoles: 'program_staff,finance_team', approverRoles: 'admin,manager,project_manager' },
+        { reportType: 'quarterly', submitterRoles: 'program_staff,finance_team', approverRoles: 'admin,manager' },
+        { reportType: 'biannual', submitterRoles: 'program_staff,finance_team', approverRoles: 'admin' },
+        { reportType: 'annual', submitterRoles: 'program_staff,finance_team', approverRoles: 'admin' },
+        { reportType: 'incident', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'admin,manager,project_manager' },
+      ],
+    }),
+    prisma.userScopeMapping.create({
+      data: { userId: james.id, region: 'Oromia', zone: 'East Shewa', woreda: 'Adama', kebele: 'Kebele 03' },
+    }),
+  ]);
 
   const projects = await Promise.all([
     prisma.project.create({
