@@ -401,24 +401,15 @@ const Sidebar = ({
       </div>
 
       <div className="sidebar-footer">
-        <div
-          className={`nav-item ${currentPage === 'settings' ? 'active' : ''}`}
-          onClick={() => onPageChange('settings')}
-          role="button"
-          tabIndex={0}
-        >
-          {renderIcon('settings')}
-          Settings
-        </div>
         <button
           type="button"
-          className="sidebar-logout"
+          className="sidebar-sign-out"
           onClick={() => {
             onClose?.();
             logout();
           }}
         >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
