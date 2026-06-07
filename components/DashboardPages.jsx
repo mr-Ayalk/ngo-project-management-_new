@@ -662,23 +662,6 @@ const DashboardPages = ({
     setDropTarget(null);
   };
 
-  const handleCompleteTask = async (taskTitle) => {
-    try {
-      const allTasks = await api.tasks();
-      const task = allTasks.tasks.find((t) => t.title === taskTitle);
-      if (!task) {
-        onNavigate?.('projects');
-        return;
-      }
-      await api.updateTask(task.id, { status: 'completed' });
-      showToast('Task marked complete');
-      const dash = await api.dashboard();
-      setDashboard(dash);
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
   const handleSaveEvent = async (e) => {
     e.preventDefault();
     const today = new Date().toISOString().slice(0, 10);
@@ -1069,8 +1052,7 @@ const DashboardPages = ({
                 <span className="card-action" onClick={() => onNavigate?.('projects')}>View All</span>
               </div>
               {dashboard.upcomingTasks.map((task, i) => (
-                <div key={i} className="task-item" style={{ cursor: 'pointer' }} onClick={() => handleCompleteTask(task.title)}>
-                  <div className="task-check" title="Mark complete"></div>
+                <div key={i} className="task-item">
                   <div className="task-body"><div className="task-title">{task.title}</div><div className="task-project">{task.project}</div></div>
                   <div className="task-date">{task.date}</div>
                 </div>
