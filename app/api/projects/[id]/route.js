@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
+import { assertProjectAccess } from '@/lib/project-access';
 
 export async function GET(req, { params }) {
   try {
@@ -22,6 +23,9 @@ export async function GET(req, { params }) {
     });
 
     if (!project) return error('Project not found', 404);
+
+    const hasAccess = await assertProjectAccess(auth.user, params.id);
+    if (!hasAccess) return error('You do not have access to this project', 403);
 
     const utilization = project.budget > 0 ? Math.round((project.spent / project.budget) * 100) : 0;
 

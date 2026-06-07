@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
+import { assertProjectAccess } from '@/lib/project-access';
 
 const COLUMN_MAP = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 
@@ -37,6 +38,11 @@ export async function GET(req) {
     const where = {};
     if (status) where.status = status;
     if (projectId) where.projectId = projectId;
+
+    if (projectId) {
+      const hasAccess = await assertProjectAccess(auth.user, projectId);
+      if (!hasAccess) return error('You do not have access to this project', 403);
+    }
 
     const tasks = await prisma.task.findMany({
       where,

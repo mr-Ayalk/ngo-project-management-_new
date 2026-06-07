@@ -5,7 +5,7 @@ import { getInitials, parseAvatar } from '@/lib/avatar';
 export default function UserAvatar({ user, size = 'md', className = '' }) {
   const name = user?.name || '';
   const parsed = parseAvatar(user?.avatar);
-  const sizeClass = size === 'lg' ? 'avatar lg' : size === 'sm' ? 'avatar sm' : 'avatar';
+  const sizeClass = size === 'xl' ? 'avatar xl' : size === 'lg' ? 'avatar lg' : size === 'sm' ? 'avatar sm' : 'avatar';
 
   if (parsed.type === 'emoji') {
     return (

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import logo1 from '@/app/assets/logo1.png';
@@ -16,7 +15,6 @@ const Sidebar = ({
   isAdmin = false,
 }) => {
   const { logout } = useAuth();
-  const [expandedPins, setExpandedPins] = useState({});
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -156,35 +154,16 @@ const Sidebar = ({
           <div className="sidebar-pinned">
             <div className="sidebar-pinned-label">Pinned Projects</div>
             {pinnedProjects.map((pin) => (
-              <div key={pin.projectId} className="sidebar-pinned-item">
-                <button
-                  type="button"
-                  className="sidebar-pinned-toggle"
-                  onClick={() => setExpandedPins((prev) => ({ ...prev, [pin.projectId]: !prev[pin.projectId] }))}
-                  aria-label="Expand project"
-                >
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="12" height="12"
-                    style={{ transform: expandedPins[pin.projectId] ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
+              <button
+                key={pin.projectId}
+                type="button"
+                className="sidebar-pinned-row"
+                onClick={() => onOpenProject?.(pin)}
+                title={pin.name}
+              >
                 <span className="sidebar-pinned-dot" />
-                <button
-                  type="button"
-                  className="sidebar-pinned-name"
-                  onClick={() => onOpenProject?.(pin)}
-                  title={pin.name}
-                >
-                  {pin.name.length > 22 ? `${pin.name.slice(0, 22)}…` : pin.name}
-                </button>
-                {expandedPins[pin.projectId] && (
-                  <div className="sidebar-pinned-sub">
-                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'tasks' })}>Tasks</button>
-                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'overview' })}>Overview</button>
-                    <button type="button" onClick={() => onOpenProject?.({ ...pin, tab: 'budget' })}>Budget</button>
-                  </div>
-                )}
-              </div>
+                <span className="sidebar-pinned-name">{pin.name.length > 24 ? `${pin.name.slice(0, 24)}…` : pin.name}</span>
+              </button>
             ))}
           </div>
         )}

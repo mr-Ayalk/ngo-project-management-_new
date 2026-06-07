@@ -3,8 +3,15 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
+import { userCanAccessProject } from '@/lib/project-access';
 
-function formatProject(p) {
+function formatProject(p, user) {
+  const hasAccess = userCanAccessProject(user, {
+    managerId: p.managerId,
+    leadId: p.leadId,
+    members: p.members,
+  });
+
   return {
     id: p.id,
     name: p.name,
@@ -22,6 +29,9 @@ function formatProject(p) {
     dueDate: formatDate(p.endDate),
     donor: p.donor,
     donorName: p.donorName,
+    managerId: p.managerId,
+    leadId: p.leadId,
+    hasAccess,
     assumptions: p.assumptions,
     risks: p.risks,
     indicators: p.indicators,
@@ -69,7 +79,7 @@ export async function GET(req) {
       orderBy: { startDate: 'desc' },
     });
 
-    return json(projects.map(formatProject));
+    return json(projects.map((p) => formatProject(p, auth.user)));
   } catch (err) {
     console.error('Projects GET error:', err);
     return error('Failed to load projects', 500);
@@ -137,7 +147,7 @@ export async function POST(req) {
       projectId: project.id,
     });
 
-    return json(formatProject(project), 201);
+    return json(formatProject(project, user), 201);
   } catch (err) {
     console.error('Projects POST error:', err);
     return error('Failed to create project', 500);

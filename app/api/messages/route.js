@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, parseBody, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
+import { assertProjectAccess } from '@/lib/project-access';
 
 async function collectMessageRecipients(projectId, senderId, taskId = null) {
   const [members, project, admins, task] = await Promise.all([
@@ -52,6 +53,11 @@ export async function GET(req) {
       where.taskId = null;
     }
 
+    if (projectId) {
+      const hasAccess = await assertProjectAccess(auth.user, projectId);
+      if (!hasAccess) return error('You do not have access to this project', 403);
+    }
+
     const messages = await prisma.message.findMany({
       where,
       take: 100,
@@ -89,6 +95,9 @@ export async function POST(req) {
     const body = await parseBody(req);
     if (!body?.content) return error('Content is required');
     if (!body?.projectId) return error('projectId is required');
+
+    const hasAccess = await assertProjectAccess(auth.user, body.projectId);
+    if (!hasAccess) return error('You do not have access to this project', 403);
 
     const message = await prisma.message.create({
       data: {

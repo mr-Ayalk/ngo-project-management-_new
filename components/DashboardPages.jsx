@@ -307,6 +307,10 @@ const DashboardPages = ({
   }, [showToast]);
 
   const openProjectDetail = (proj, tab = 'overview') => {
+    if (proj.hasAccess === false) {
+      showToast('You are not assigned to this project and cannot view its details.', 'error');
+      return;
+    }
     setSelectedProject(proj);
     setProjectView('detail');
     setActiveTab(tab);
@@ -371,7 +375,8 @@ const DashboardPages = ({
           if (task) setSelectedTask(task);
         }
         onPendingNavHandled?.();
-      } catch {
+      } catch (err) {
+        showToast(err.message || 'You do not have access to this project', 'error');
         onPendingNavHandled?.();
       }
     };
@@ -386,7 +391,14 @@ const DashboardPages = ({
 
   useEffect(() => {
     if (selectedProject?.id) {
-      api.project(selectedProject.id).then(setProjectDetail).catch(() => setProjectDetail(null));
+      api.project(selectedProject.id)
+        .then(setProjectDetail)
+        .catch((err) => {
+          setProjectDetail(null);
+          setProjectView('list');
+          setSelectedProject(null);
+          showToast(err.message || 'You do not have access to this project', 'error');
+        });
     } else {
       setProjectDetail(null);
     }
@@ -1094,8 +1106,16 @@ const DashboardPages = ({
             <div className="projects-table">
               <div className="table-head"><span>Project</span><span>Status</span><span>Progress</span><span>Budget</span><span>Start Date</span><span></span></div>
               {projects.map((proj) => (
-                <div key={proj.id} className="table-row" onClick={() => openProjectDetail(proj)}>
-                  <div className="proj-name-cell"><ProjectIcon variant={proj.icon} /><span className="proj-name">{proj.name}</span></div>
+                <div
+                  key={proj.id}
+                  className={`table-row${proj.hasAccess === false ? ' table-row-restricted' : ''}`}
+                  onClick={() => openProjectDetail(proj)}
+                >
+                  <div className="proj-name-cell">
+                    <ProjectIcon variant={proj.icon} />
+                    <span className="proj-name">{proj.name}</span>
+                    {proj.hasAccess === false && <span className="proj-restricted-badge">View only</span>}
+                  </div>
                   <span><span className={`status-badge ${proj.status}`}><span className="status-dot"></span>{statusLabel(proj.status)}</span></span>
                   <span><div className="prog-wrap"><div className="prog-bar"><div className={`prog-fill${proj.status === 'at-risk' ? ' amber' : proj.status === 'delayed' ? ' red' : ''}`} style={{ width: `${proj.progress}%` }}></div></div><span className="prog-pct">{proj.progress}%</span></div></span>
                   <span className="tbl-budget">{proj.budget}</span>
@@ -1104,7 +1124,7 @@ const DashboardPages = ({
                     <button className="more-btn" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === proj.id ? null : proj.id); }}>⋯</button>
                     {menuOpen === proj.id && (
                       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => { openProjectDetail(proj); setMenuOpen(null); }}>View</button>
+                        <button onClick={() => { openProjectDetail(proj); setMenuOpen(null); }} disabled={proj.hasAccess === false}>View</button>
                         {isManager && <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>}
                         <button onClick={async () => {
                           const pinned = pinnedProjects.some((p) => p.projectId === proj.id);
@@ -1532,7 +1552,7 @@ const DashboardPages = ({
         <>
           <div className="page-header">
             <h1>Settings</h1>
-            <p>Manage your profile{user?.role === 'admin' ? ', organization, team access,' : ''} and security preferences.</p>
+            <p>Manage your profile, security, and workspace preferences.</p>
           </div>
           <ProfileSettings />
           <div className="settings-grid">

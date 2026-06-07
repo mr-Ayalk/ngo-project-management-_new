@@ -70,6 +70,19 @@ export default function MessagesInbox({
     [notifications.notifications]
   );
 
+  const accessibleProjects = useMemo(
+    () => (lookup.projects || []).filter((p) => p.hasAccess !== false),
+    [lookup.projects]
+  );
+
+  useEffect(() => {
+    if (!msgProjectId) return;
+    if (!accessibleProjects.some((p) => p.id === msgProjectId)) {
+      setMsgProjectId('');
+      toast.error('You do not have access to that project channel.');
+    }
+  }, [msgProjectId, accessibleProjects]);
+
   useEffect(() => {
     if (!initialSelection?.projectId) return;
     setTab('messages');
@@ -127,7 +140,7 @@ export default function MessagesInbox({
     }
   };
 
-  const selectedProject = lookup.projects.find((p) => p.id === msgProjectId);
+  const selectedProject = accessibleProjects.find((p) => p.id === msgProjectId);
   const selectedProjectName = selectedProject?.name || '';
   const messageCount = messages?.messages?.length || 0;
 
@@ -193,7 +206,7 @@ export default function MessagesInbox({
           <aside className="inbox-sidebar">
             <div className="inbox-sidebar-label">Channels</div>
             <div className="inbox-project-list">
-              {lookup.projects.length ? lookup.projects.map((project) => (
+              {accessibleProjects.length ? accessibleProjects.map((project) => (
                 <button
                   key={project.id}
                   type="button"

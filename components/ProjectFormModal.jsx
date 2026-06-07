@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import Modal from '@/components/Modal';
 import AutocompleteInput from '@/components/AutocompleteInput';
 import LocationMap from '@/components/LocationMap';
+import TeamMemberSelect from '@/components/TeamMemberSelect';
 import {
   REGIONS, KEBELES, WOREDAS, WOREDA_BUDGETS,
   LOCATION_TYPES, formatBudgetInput, parseBudgetInput,
@@ -34,14 +35,6 @@ export default function ProjectFormModal({
       town: '',
       woreda: '',
       kebele: '',
-    });
-  };
-
-  const toggleMember = (userId) => {
-    const ids = form.memberIds || [];
-    setForm({
-      ...form,
-      memberIds: ids.includes(userId) ? ids.filter((id) => id !== userId) : [...ids, userId],
     });
   };
 
@@ -128,15 +121,12 @@ export default function ProjectFormModal({
           </div>
           <div className="form-field">
             <label>Team Members</label>
-            <div className="team-member-picker">
-              {users.filter((u) => u.id !== form.managerId).map((u) => (
-                <label key={u.id} className={`team-member-chip${(form.memberIds || []).includes(u.id) ? ' selected' : ''}`}>
-                  <input type="checkbox" checked={(form.memberIds || []).includes(u.id)} onChange={() => toggleMember(u.id)} />
-                  <span>{u.name}</span>
-                  <small>{u.roleLabel || u.role}</small>
-                </label>
-              ))}
-            </div>
+            <TeamMemberSelect
+              users={users}
+              value={form.memberIds || []}
+              onChange={(memberIds) => setForm({ ...form, memberIds })}
+              excludeIds={[form.managerId].filter(Boolean)}
+            />
           </div>
         </div>
 

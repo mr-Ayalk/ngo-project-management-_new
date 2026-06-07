@@ -13,6 +13,10 @@ model User {
   name             String
   password         String
   avatar           String?
+  phone            String?
+  bio              String?         @db.Text
+  countryScope     String?
+  coreFocus        String?
   role             String          @default("staff")
   staffRole        String?
   isActive         Boolean         @default(true)

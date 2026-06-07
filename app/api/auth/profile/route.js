@@ -52,6 +52,26 @@ export async function PUT(req) {
       }
     }
 
+    if (body.phone !== undefined) data.phone = String(body.phone).trim() || null;
+    if (body.bio !== undefined) data.bio = String(body.bio).trim() || null;
+    if (body.countryScope !== undefined) data.countryScope = String(body.countryScope).trim() || null;
+    if (body.coreFocus !== undefined) data.coreFocus = String(body.coreFocus).trim() || null;
+
+    if (body.email !== undefined) {
+      if (auth.user.role !== 'admin') {
+        return error('Only administrators can change their email address', 403);
+      }
+      const email = String(body.email).trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return error('A valid email address is required', 400);
+      }
+      const taken = await prisma.user.findUnique({ where: { email } });
+      if (taken && taken.id !== auth.user.id) {
+        return error('This email is already in use', 400);
+      }
+      data.email = email;
+    }
+
     if (body.currentPassword && body.newPassword) {
       const existing = await prisma.user.findUnique({ where: { id: auth.user.id } });
       const valid = await verifyPassword(body.currentPassword, existing.password);

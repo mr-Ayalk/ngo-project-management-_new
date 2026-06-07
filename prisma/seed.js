@@ -51,7 +51,7 @@ async function main() {
   await prisma.organization.deleteMany();
   await prisma.user.deleteMany();
 
-  const password = await bcrypt.hash('password123', 10);
+  const password = await bcrypt.hash('123456789', 10);
 
   const users = await Promise.all([
     prisma.user.create({
@@ -449,7 +449,7 @@ async function main() {
   }
 
   console.log('Seed completed successfully!');
-  console.log('Login credentials: ayalkbet@bamah.com / password123');
+  console.log('Login credentials: ayalkbet@bamah.com / 123456789');
 }
 
 main()
