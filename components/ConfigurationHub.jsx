@@ -235,7 +235,7 @@ export default function ConfigurationHub({
     );
   }
 
-  if (!canEdit && configPage !== 'config-guide') {
+  if (!canEdit) {
     return (
       <div className="config-page">
         <ConfigHero pageId={configPage} />
@@ -635,45 +635,6 @@ export default function ConfigurationHub({
         </>
       )}
 
-      {/* ── KOBO ── */}
-      {configPage === 'config-kobo' && (
-        <>
-          <ConfigHero pageId={configPage}>
-            <button type="button" className="btn-primary" disabled={submitting} onClick={() => saveOrgFields(org || data.organization)}>Save Integration</button>
-          </ConfigHero>
-          <div className="config-panel">
-            <label className="config-toggle-row">
-              <input type="checkbox" checked={org?.koboEnabled ?? data.organization?.koboEnabled} onChange={(e) => updateOrg({ koboEnabled: e.target.checked })} />
-              Enable KoboToolbox integration for mobile field data collection
-            </label>
-            <div className="form-field"><label>Kobo Server URL</label><input value={org?.koboApiUrl || ''} onChange={(e) => updateOrg({ koboApiUrl: e.target.value })} placeholder="https://kf.kobotoolbox.org" /></div>
-            <div className="form-field"><label>Default Project UID</label><input value={org?.koboProjectId || ''} onChange={(e) => updateOrg({ koboProjectId: e.target.value })} placeholder="Project identifier from Kobo" /></div>
-            <p className="config-panel-desc">KoboToolbox is widely used by NGOs for surveys, beneficiary registration, and M&E data collection in low-connectivity environments.</p>
-          </div>
-        </>
-      )}
-
-      {/* ── USER GUIDE ── */}
-      {configPage === 'config-guide' && (
-        <>
-          <ConfigHero pageId={configPage} />
-          <div className="config-guide-grid">
-            {[
-              { title: 'Getting Started', body: 'Log in with your NGO email, review your assigned projects, and check the Inbox for field updates.' },
-              { title: 'Creating Reports', body: 'Use Report Management to submit daily, weekly, monthly, or incident reports. Draft first, then submit for manager approval.' },
-              { title: 'Project Access', body: 'You can only open project details and messaging for projects you are assigned to as manager, lead, or team member.' },
-              { title: 'Beneficiaries & M&E', body: 'Record beneficiary data by program and region. Indicators configured here drive impact tracking on the Reports dashboard.' },
-              { title: 'Documents & Compliance', body: 'Upload donor agreements, budgets, and audit files under Documents. Use categories for easy retrieval.' },
-              { title: 'Need Help?', body: 'Contact your NGO administrator or project manager for account access, scope changes, or training sessions.' },
-            ].map((item) => (
-              <article key={item.title} className="config-guide-card partner-card">
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 }

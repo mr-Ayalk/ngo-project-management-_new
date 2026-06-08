@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { REPORT_TYPES } from '@/lib/report-types';
-import { CONFIG_PAGES, CONFIG_EXTRA } from '@/lib/config-pages';
+import { CONFIG_PAGES } from '@/lib/config-pages';
 import { PLANNING_PAGES } from '@/lib/planning-pages';
 import logo1 from '@/app/assets/logo1.png';
 
@@ -277,19 +277,6 @@ const Sidebar = ({
             {renderIcon('messages')}
             Inbox
           </div>
-          <div
-            className={`nav-item${currentPage === 'config-guide' ? ' active' : ''}`}
-            onClick={() => onPageChange('config-guide')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onPageChange('config-guide')}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-            </svg>
-            User Guide
-          </div>
           {isAdmin && (
             <div
               className={`nav-item${currentPage === 'audit-log' ? ' active' : ''}`}
@@ -352,22 +339,6 @@ const Sidebar = ({
               </div>
             )}
           </div>
-          {CONFIG_EXTRA.filter((p) => p.id === 'config-kobo').map((page) => (
-            <div
-              key={page.id}
-              className={`nav-item${currentPage === page.id ? ' active' : ''}`}
-              onClick={() => onPageChange(page.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onPageChange(page.id)}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <rect x="5" y="2" width="14" height="20" rx="2"/>
-                <line x1="12" y1="18" x2="12" y2="18"/>
-              </svg>
-              {page.label}
-            </div>
-          ))}
 
           <div
             className={`nav-item${currentPage === 'settings' ? ' active' : ''}`}
@@ -403,6 +374,18 @@ const Sidebar = ({
       </div>
 
       <div className="sidebar-footer">
+        <button
+          type="button"
+          className={`sidebar-help${currentPage === 'help' ? ' active' : ''}`}
+          onClick={() => onPageChange('help')}
+        >
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          Help
+        </button>
         <button
           type="button"
           className="sidebar-sign-out"

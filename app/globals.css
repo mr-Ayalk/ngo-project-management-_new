@@ -584,6 +584,14 @@ canvas {
   padding: 8px 0;
   border-bottom: 1px solid var(--gray-100);
 }
+.activity-item-clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0 -8px;
+  transition: background 0.15s;
+}
+.activity-item-clickable:hover { background: var(--gray-50); }
 
 .activity-item:last-child {
   border-bottom: none;
@@ -7162,4 +7170,54 @@ canvas {
 .dark .audit-stat-card,
 .dark .audit-table-wrap { background: var(--panel); border-color: var(--border); }
 .dark .audit-hero h1 { color: #e2e8f0; }
+
+/* Help sidebar + project map */
+.sidebar-help {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gray-500);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.sidebar-help svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sidebar-help:hover,
+.sidebar-help.active { background: rgba(37, 99, 235, 0.08); color: var(--blue); }
+.help-page { width: 100%; }
+.project-map-section { margin-top: 20px; }
+.project-map-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.project-map-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--gray-50);
+  box-shadow: var(--shadow);
+}
+.project-map-frame iframe {
+  display: block;
+  width: 100%;
+  height: 280px;
+  border: 0;
+}
+.project-map-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--blue);
+  text-decoration: none;
+}
+.project-map-link:hover { text-decoration: underline; }
 

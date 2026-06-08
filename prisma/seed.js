@@ -156,7 +156,8 @@ async function main() {
       enabledRegions: JSON.stringify(['Addis Ababa', 'Amhara', 'Oromia', 'SNNPR', 'Tigray', 'Somali']),
       dashboardLayout: JSON.stringify(['kpi', 'tasks', 'budget', 'reports', 'beneficiaries', 'calendar']),
       koboEnabled: false,
-      koboApiUrl: 'https://kf.kobotoolbox.org',
+      koboApiUrl: '',
+      koboProjectId: '',
     },
   });
 

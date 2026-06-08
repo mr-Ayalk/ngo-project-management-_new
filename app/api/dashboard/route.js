@@ -201,6 +201,12 @@ export async function GET(req) {
         },
       },
       activities: activities.map((a, i) => ({
+        id: a.id,
+        entity: a.entity,
+        entityId: a.entityId,
+        projectId: a.projectId,
+        taskId: a.taskId,
+        entityId: a.entityId,
         initials: getInitials(a.user.name),
         bg: AVATAR_COLORS[i % AVATAR_COLORS.length],
         title: a.project?.name || a.entity,

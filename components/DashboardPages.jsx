@@ -16,6 +16,8 @@ import ReportsApproval from '@/components/ReportsApproval';
 import ConfigurationHub from '@/components/ConfigurationHub';
 import PlanningModule from '@/components/PlanningModule';
 import AuditLogPage from '@/components/AuditLogPage';
+import UserGuidePage from '@/components/UserGuidePage';
+import ProjectLocationMap from '@/components/ProjectLocationMap';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import { isConfigPage } from '@/lib/config-pages';
 import { isPlanningPage } from '@/lib/planning-pages';
@@ -145,6 +147,8 @@ const DashboardPages = ({
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [dismissedOverdue, setDismissedOverdue] = useState(() => new Set());
+  const [pendingActivityNav, setPendingActivityNav] = useState(null);
 
   const [lookup, setLookup] = useState({ users: [], projects: [] });
 
@@ -417,6 +421,43 @@ const DashboardPages = ({
       onTopbarSearchSync?.('');
     }
   }, [currentPage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = JSON.parse(localStorage.getItem('dismissedOverdue') || '[]');
+      if (Array.isArray(stored) && stored.length) setDismissedOverdue(new Set(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (currentPage !== 'projects' || !pendingActivityNav?.projectId) return;
+    const openFromActivity = async () => {
+      try {
+        const proj = await api.project(pendingActivityNav.projectId);
+        setSelectedProject({
+          id: proj.id,
+          name: proj.name,
+          status: proj.status,
+          icon: proj.icon,
+          progress: proj.progress,
+          budget: proj.budget,
+          hasAccess: true,
+        });
+        setProjectView('detail');
+        setActiveTab(pendingActivityNav.tab || 'overview');
+        if (pendingActivityNav.taskId && proj.tasks) {
+          const task = proj.tasks.find((t) => t.id === pendingActivityNav.taskId);
+          if (task) setSelectedTask(task);
+        }
+      } catch (err) {
+        showToast(err.message || 'You do not have access to this project', 'error');
+      } finally {
+        setPendingActivityNav(null);
+      }
+    };
+    openFromActivity();
+  }, [currentPage, pendingActivityNav, showToast]);
 
   useEffect(() => {
     if (!pendingNav?.projectId) return;
@@ -1270,6 +1311,41 @@ const DashboardPages = ({
     }
   };
 
+  const dismissOverdueItem = (item) => {
+    const key = `${item.type}-${item.id}`;
+    setDismissedOverdue((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dismissedOverdue', JSON.stringify([...next]));
+      }
+      return next;
+    });
+  };
+
+  const navigateFromActivity = (activity) => {
+    closeModal();
+    const taskId = activity.taskId || (activity.entity === 'task' ? activity.entityId : null);
+    if (activity.projectId) {
+      onNavigate?.('projects');
+      setPendingActivityNav({
+        projectId: activity.projectId,
+        taskId: taskId || null,
+        tab: (taskId || activity.entity === 'task') ? 'tasks' : 'overview',
+      });
+      return;
+    }
+    const entityRoutes = {
+      beneficiary: 'beneficiaries',
+      document: 'documents',
+      budget: 'budget',
+      report: 'reports-overview',
+    };
+    const page = entityRoutes[activity.entity?.toLowerCase()];
+    if (page) onNavigate?.(page);
+    else showToast('This activity is not linked to a specific page.', 'info');
+  };
+
   const downloadReport = (report) => {
     if (report.fileUrl && report.fileUrl !== '#') {
       const a = document.createElement('a');
@@ -1334,25 +1410,18 @@ const DashboardPages = ({
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
         <>
-          {dashboard.portal && (
-            <section className="portal-welcome-card">
-              <div className="page-header page-header-row portal-welcome-inner">
-                <div>
-                  <p className="portal-greeting">Welcome! <strong>{firstName}</strong>,</p>
-                  <p className="portal-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                  <h1>{dashboard.portal.title}</h1>
-                  <p className="portal-welcome-sub">{dashboard.portal.subtitle}</p>
-                  {dashboard.portal.tagline && <p className="portal-welcome-tagline">{dashboard.portal.tagline}</p>}
-                </div>
-                {isManager && (
-                  <button type="button" className="btn-primary" onClick={() => openProjectModal()}>
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    New Project
-                  </button>
-                )}
-              </div>
-            </section>
-          )}
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Welcome, {firstName}</h1>
+              <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            </div>
+            {isManager && (
+              <button type="button" className="btn-primary" onClick={() => openProjectModal()}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Project
+              </button>
+            )}
+          </div>
 
           <div className="page-header">
             <h1>Impact Overview</h1>
@@ -1413,7 +1482,14 @@ const DashboardPages = ({
                 <span className="card-action" onClick={openActivities}>View All</span>
               </div>
               {dashboard.activities.map((a, i) => (
-                <div key={i} className="activity-item">
+                <div
+                  key={a.id || i}
+                  className="activity-item activity-item-clickable"
+                  onClick={() => navigateFromActivity(a)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigateFromActivity(a)}
+                >
                   <div className="act-avatar" style={{ background: a.bg }}>{a.initials}</div>
                   <div className="act-body"><div className="act-title">{a.title}</div><div className="act-sub">{a.sub}</div></div>
                   <div className="act-time">{a.time}</div>
@@ -1607,6 +1683,12 @@ const DashboardPages = ({
                   </div>
                 </div>
               )}
+              <ProjectLocationMap
+                region={projectDetail.region}
+                town={projectDetail.town}
+                zone={projectDetail.zone}
+                woreda={projectDetail.woreda}
+              />
             </>
           )}
 
@@ -1723,17 +1805,17 @@ const DashboardPages = ({
                 <p className="cal-empty-note">No upcoming events this month.</p>
               )}
 
-              {calendar.overdue?.length > 0 && (
+              {calendar.overdue?.filter((item) => !dismissedOverdue.has(`${item.type}-${item.id}`)).length > 0 && (
                 <>
                   <h3 className="cal-sidebar-title cal-overdue-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                       <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
-                    Overdue ({calendar.overdue.length})
+                    Overdue ({calendar.overdue.filter((item) => !dismissedOverdue.has(`${item.type}-${item.id}`)).length})
                   </h3>
                   <p className="cal-sidebar-sub cal-overdue-sub">Deadlines that have passed</p>
-                  {calendar.overdue.map((item) => (
+                  {calendar.overdue.filter((item) => !dismissedOverdue.has(`${item.type}-${item.id}`)).map((item) => (
                     <div key={`${item.type}-${item.id}`} className="event-item event-item-overdue">
                       <div className="event-dot event-dot-warning" />
                       <div className="event-body">
@@ -1741,6 +1823,18 @@ const DashboardPages = ({
                         <div className="ev-date">{item.date}{item.project ? ` · ${item.project}` : ''}</div>
                         <div className="ev-overdue-tag">{item.daysOverdue} day{item.daysOverdue !== 1 ? 's' : ''} overdue · {item.type === 'task' ? 'Task' : 'Event'}</div>
                       </div>
+                      <button
+                        type="button"
+                        className="cal-overdue-dismiss"
+                        aria-label="Dismiss overdue reminder"
+                        title="Dismiss reminder"
+                        onClick={() => dismissOverdueItem(item)}
+                      >
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                        </svg>
+                      </button>
                     </div>
                   ))}
                 </>
@@ -2003,6 +2097,9 @@ const DashboardPages = ({
           onInitialSelectionHandled={() => setMsgInitialSelection(null)}
         />
       )}
+
+      {/* ── HELP ── */}
+      {currentPage === 'help' && <UserGuidePage />}
 
       {/* ── AUDIT LOG ── */}
       {currentPage === 'audit-log' && (
@@ -2425,7 +2522,14 @@ const DashboardPages = ({
       <Modal open={modal === 'activities'} title="All Activities" onClose={closeModal} width={560}>
         <div className="activity-list-full">
           {activities.length ? activities.map((a, i) => (
-            <div key={a.id || i} className="activity-item">
+            <div
+              key={a.id || i}
+              className="activity-item activity-item-clickable"
+              onClick={() => navigateFromActivity(a)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && navigateFromActivity(a)}
+            >
               <div className="act-avatar" style={{ background: AVATAR_COLORS[i % 4] }}>{a.user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2)}</div>
               <div className="act-body"><div className="act-title">{a.project?.name || a.entity}</div><div className="act-sub">{a.description || `${a.action} on ${a.entity}`}</div></div>
             </div>
