@@ -3883,6 +3883,26 @@ canvas {
 .settings-active { color: var(--green); }
 .settings-inactive { color: var(--gray-400); }
 
+.staff-users-table .settings-users-head,
+.staff-users-table .staff-users-row {
+  grid-template-columns: 1.2fr 1.5fr 1fr 80px;
+}
+
+.staff-email {
+  color: var(--gray-500);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staff-section { margin-top: 20px; }
+
+.project-logframe-toolbar {
+  margin-bottom: 16px;
+}
+
+.project-logframe-panel { margin-top: 8px; }
+
 .dark .settings-users-head { background: rgba(255,255,255,0.04); }
 .dark .settings-users-row:hover { background: rgba(255,255,255,0.03); }
 

@@ -4,8 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { REPORT_TYPES } from '@/lib/report-types';
-import { CONFIG_PAGES } from '@/lib/config-pages';
-import { PLANNING_PAGES } from '@/lib/planning-pages';
+import { canManageUsers } from '@/lib/roles';
 import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({
@@ -20,14 +19,15 @@ const Sidebar = ({
 }) => {
   const { logout, user } = useAuth();
   const [reportsExpanded, setReportsExpanded] = useState(true);
-  const [configExpanded, setConfigExpanded] = useState(true);
-  const [planningExpanded, setPlanningExpanded] = useState(true);
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'projects', label: 'Projects', icon: 'projects' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'budget', label: 'Budget', icon: 'budget' },
+    ...(canManageUsers(user) ? [{ id: 'staff-management', label: 'Staff Management', icon: 'staff' }] : []),
+    { id: 'units', label: 'Units', icon: 'units' },
+    { id: 'indicators', label: 'Indicators', icon: 'indicators' },
   ];
 
   const manageNav = [
@@ -38,7 +38,6 @@ const Sidebar = ({
   ];
 
   const isAdmin = user?.role === 'admin';
-
   const isReportPage = (id) => id === currentPage || (id === 'reports-overview' && currentPage === 'reports');
 
   const renderIcon = (type) => {
@@ -69,6 +68,26 @@ const Sidebar = ({
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <line x1="12" y1="1" x2="12" y2="23"/>
           <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+        </svg>
+      ),
+      staff: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+      ),
+      units: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      ),
+      indicators: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
         </svg>
       ),
       reports: (
@@ -116,12 +135,6 @@ const Sidebar = ({
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
         </svg>
       ),
-      settings: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-        </svg>
-      ),
     };
     return icons[type] || null;
   };
@@ -144,23 +157,6 @@ const Sidebar = ({
   );
 
   const reportGroupActive = currentPage.startsWith('reports-') || currentPage === 'reports';
-  const configGroupActive = currentPage.startsWith('config-');
-  const planningGroupActive = currentPage === 'planning' || currentPage.startsWith('planning-');
-
-  const configSubIcon = (pageId) => {
-    const icons = {
-      'config-units': '◫',
-      'config-indicators': '◎',
-      'config-locations': '⌖',
-      'config-reporter-approver': '⇄',
-      'config-user-woreda': '⊞',
-      'config-landing': '⌂',
-      'config-dashboard': '▦',
-      'config-colors': '◑',
-      'config-datetime': '⏲',
-    };
-    return icons[pageId] || '•';
-  };
 
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
@@ -176,43 +172,6 @@ const Sidebar = ({
         <nav className="nav">
           <div className="nav-section-label">Menu</div>
           {mainNav.map(renderNavItem)}
-
-          <div className="nav-section-label">Planning Module</div>
-          <div className={`nav-group${planningExpanded ? ' open' : ''}${planningGroupActive ? ' active-group' : ''}`}>
-            <button
-              type="button"
-              className="nav-group-toggle"
-              onClick={() => setPlanningExpanded((v) => !v)}
-              aria-expanded={planningExpanded}
-            >
-              {renderIcon('projects')}
-              <span>Planning Module</span>
-              <svg className="nav-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {planningExpanded && (
-              <div className="nav-sub-list">
-                <button
-                  type="button"
-                  className={`nav-sub-item${currentPage === 'planning' ? ' active' : ''}`}
-                  onClick={() => onPageChange('planning')}
-                >
-                  Overview
-                </button>
-                {PLANNING_PAGES.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className={`nav-sub-item${currentPage === page.id ? ' active' : ''}`}
-                    onClick={() => onPageChange(page.id)}
-                  >
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           <div className="nav-section-label">Reports</div>
           <div className={`nav-group${reportsExpanded ? ' open' : ''}${reportGroupActive ? ' active-group' : ''}`}>
@@ -294,64 +253,6 @@ const Sidebar = ({
               Audit Log
             </div>
           )}
-
-          <div className="nav-section-label">M &amp; E</div>
-          <div
-            className={`nav-item${currentPage === 'config-indicators' ? ' active' : ''}`}
-            onClick={() => onPageChange('config-indicators')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onPageChange('config-indicators')}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-            M &amp; E Module
-          </div>
-
-          <div className="nav-section-label">Configurations</div>
-          <div className={`nav-group${configExpanded ? ' open' : ''}${configGroupActive ? ' active-group' : ''}`}>
-            <button
-              type="button"
-              className="nav-group-toggle"
-              onClick={() => setConfigExpanded((v) => !v)}
-              aria-expanded={configExpanded}
-            >
-              {renderIcon('settings')}
-              <span>Configurations</span>
-              <svg className="nav-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {configExpanded && (
-              <div className="nav-sub-list config-sub-list">
-                {CONFIG_PAGES.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className={`nav-sub-item config-sub-item${currentPage === page.id ? ' active' : ''}`}
-                    onClick={() => onPageChange(page.id)}
-                  >
-                    <span className="config-sub-icon" aria-hidden="true">{configSubIcon(page.id)}</span>
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div
-            className={`nav-item${currentPage === 'settings' ? ' active' : ''}`}
-            onClick={() => onPageChange('settings')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onPageChange('settings')}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-            </svg>
-            User Management
-          </div>
         </nav>
 
         {pinnedProjects.length > 0 && (

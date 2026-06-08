@@ -14,13 +14,14 @@ import ReportsDashboard from '@/components/ReportsDashboard';
 import ReportsManagement from '@/components/ReportsManagement';
 import ReportsApproval from '@/components/ReportsApproval';
 import ConfigurationHub from '@/components/ConfigurationHub';
-import PlanningModule from '@/components/PlanningModule';
+import StaffManagementPage from '@/components/StaffManagementPage';
+import SettingsAdminPanel from '@/components/SettingsAdminPanel';
+import ProjectLogframePanel from '@/components/ProjectLogframePanel';
 import AuditLogPage from '@/components/AuditLogPage';
 import UserGuidePage from '@/components/UserGuidePage';
 import ProjectLocationMap from '@/components/ProjectLocationMap';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import { isConfigPage } from '@/lib/config-pages';
-import { isPlanningPage } from '@/lib/planning-pages';
 import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/components/ProjectFormModal';
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
@@ -137,7 +138,8 @@ const DashboardPages = ({
   const [reportsDashboard, setReportsDashboard] = useState(null);
   const [typedReports, setTypedReports] = useState([]);
   const [configData, setConfigData] = useState(null);
-  const [planningData, setPlanningData] = useState(null);
+  const [projectLogframe, setProjectLogframe] = useState(null);
+  const [logframeLoading, setLogframeLoading] = useState(false);
   const [beneficiaries, setBeneficiaries] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docSearch, setDocSearch] = useState('');
@@ -170,7 +172,6 @@ const DashboardPages = ({
   const pageDataLoaded = useRef({});
   const [docCategory, setDocCategory] = useState('all');
   const [orgForm, setOrgForm] = useState({
-    name: '', country: '', email: '', phone: '', location: '', description: '',
     dateFormat: 'DD/MM/YYYY', timezone: 'Africa/Addis_Ababa', fiscalYearStart: 'July',
   });
   const [selectedTask, setSelectedTask] = useState(null);
@@ -299,50 +300,24 @@ const DashboardPages = ({
           }
           break;
         case 'settings': {
-          const tasks = [];
           if (user?.role === 'admin') {
-            tasks.push(api.organization().then((org) => {
-              setOrganization(org);
-              setOrgForm({
-                name: org.name || '',
-                country: org.country || '',
-                email: org.email || '',
-                phone: org.phone || '',
-                location: org.location || '',
-                description: org.description || '',
-                dateFormat: org.dateFormat || 'DD/MM/YYYY',
-                timezone: org.timezone || 'Africa/Addis_Ababa',
-                fiscalYearStart: org.fiscalYearStart || 'July',
-              });
-            }));
+            const [org, config] = await Promise.all([api.organization(), api.config()]);
+            setOrganization(org);
+            setConfigData(config);
+            setOrgForm({
+              dateFormat: org.dateFormat || 'DD/MM/YYYY',
+              timezone: org.timezone || 'Africa/Addis_Ababa',
+              fiscalYearStart: org.fiscalYearStart || 'July',
+            });
           }
-          if (canManageUsers(user)) {
-            tasks.push(api.users().then(setUsers));
-          }
+          break;
+        }
+        case 'staff-management': {
+          const tasks = [api.config().then(setConfigData)];
+          if (canManageUsers(user)) tasks.push(api.users().then(setUsers));
           await Promise.all(tasks);
           break;
         }
-        case 'planning':
-          setPlanningData(await api.planning());
-          break;
-        case 'planning-projects': {
-          const list = await api.projects();
-          setProjects(list);
-          setPlanningData({ projects: list });
-          break;
-        }
-        case 'planning-outcomes':
-          setPlanningData(await api.planningOutcomes());
-          break;
-        case 'planning-outputs':
-          setPlanningData(await api.planningOutputs());
-          break;
-        case 'planning-activities':
-          setPlanningData(await api.planningActivities());
-          break;
-        case 'planning-my-activities':
-          setPlanningData(await api.planningActivities({ mine: 'true' }));
-          break;
         default:
           if (isConfigPage(currentPage)) {
             setConfigData(await api.config());
@@ -371,6 +346,32 @@ const DashboardPages = ({
       setProjectTasks(await api.tasks({ projectId }));
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  }, [showToast]);
+
+  const loadProjectLogframe = useCallback(async (projectId, tab) => {
+    if (!projectId || !['outcomes', 'outputs', 'activities'].includes(tab)) return;
+    setLogframeLoading(true);
+    try {
+      if (tab === 'outcomes') {
+        const res = await api.planningOutcomes({ projectId });
+        setProjectLogframe({ outcomes: res.outcomes || [], users: [] });
+      } else if (tab === 'outputs') {
+        const res = await api.planningOutputs({ projectId });
+        setProjectLogframe({ outputs: res.outputs || [], outcomes: res.outcomes || [], users: [] });
+      } else {
+        const res = await api.planningActivities({ projectId });
+        setProjectLogframe({
+          activities: res.activities || [],
+          outputs: res.outputs || [],
+          outcomes: [],
+          users: res.users || [],
+        });
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setLogframeLoading(false);
     }
   }, [showToast]);
 
@@ -514,6 +515,12 @@ const DashboardPages = ({
       loadProjectTasks(selectedProject.id);
     }
   }, [projectView, selectedProject, activeTab, loadProjectTasks]);
+
+  useEffect(() => {
+    if (projectView === 'detail' && selectedProject?.id && ['outcomes', 'outputs', 'activities'].includes(activeTab)) {
+      loadProjectLogframe(selectedProject.id, activeTab);
+    }
+  }, [projectView, selectedProject, activeTab, loadProjectLogframe]);
 
   useEffect(() => {
     if (currentPage !== 'dashboard' || !dashboard?.chart?.taskStatus || !chartRef.current) return;
@@ -704,8 +711,7 @@ const DashboardPages = ({
       await api.createUser({ ...newStaffForm, role: 'staff' });
       showToast('Staff member added');
       setNewStaffForm({ name: '', email: '', password: '', staffRole: 'field_worker' });
-      const userList = await api.users();
-      setUsers(userList);
+      loadPageData(false);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1105,12 +1111,18 @@ const DashboardPages = ({
     }
   };
 
+  const refreshProjectLogframe = useCallback(() => {
+    if (projectView === 'detail' && selectedProject?.id && ['outcomes', 'outputs', 'activities'].includes(activeTab)) {
+      loadProjectLogframe(selectedProject.id, activeTab);
+    }
+  }, [projectView, selectedProject, activeTab, loadProjectLogframe]);
+
   const handleCreatePlanningOutcome = async (body) => {
     setSubmitting(true);
     try {
       await api.createPlanningOutcome(body);
       showToast('Outcome added');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1123,7 +1135,7 @@ const DashboardPages = ({
     try {
       await api.updatePlanningOutcome(id, body);
       showToast('Outcome updated');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1137,7 +1149,7 @@ const DashboardPages = ({
     try {
       await api.deletePlanningOutcome(id);
       showToast('Outcome removed');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1148,7 +1160,7 @@ const DashboardPages = ({
     try {
       await api.createPlanningOutput(body);
       showToast('Output added');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1161,7 +1173,7 @@ const DashboardPages = ({
     try {
       await api.updatePlanningOutput(id, body);
       showToast('Output updated');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1175,7 +1187,7 @@ const DashboardPages = ({
     try {
       await api.deletePlanningOutput(id);
       showToast('Output removed');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1186,7 +1198,7 @@ const DashboardPages = ({
     try {
       await api.createPlanningActivity(body);
       showToast('Activity scheduled');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1199,7 +1211,7 @@ const DashboardPages = ({
     try {
       await api.updatePlanningActivity(id, body);
       showToast('Activity updated');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1213,15 +1225,10 @@ const DashboardPages = ({
     try {
       await api.deletePlanningActivity(id);
       showToast('Activity removed');
-      loadPageData();
+      refreshProjectLogframe();
     } catch (err) {
       showToast(err.message, 'error');
     }
-  };
-
-  const openPlanningProject = (proj) => {
-    onNavigate?.('projects');
-    setTimeout(() => openProjectDetail(proj), 0);
   };
 
   const handleReportFileSelect = (file) => {
@@ -1234,7 +1241,20 @@ const DashboardPages = ({
     try {
       const updated = await api.updateOrganization(orgForm);
       setOrganization(updated);
-      showToast('Organization saved');
+      showToast('Date & time settings saved');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveLocations = async (regions) => {
+    setSubmitting(true);
+    try {
+      await api.updateConfig({ enabledRegionsList: regions });
+      showToast('Operating locations saved');
+      loadPageData(false);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -1637,14 +1657,14 @@ const DashboardPages = ({
             </div>
           </div>
           <div className="project-detail-tabs">
-            {['overview', 'tasks', 'budget', 'documents'].map((tab) => (
+            {['overview', 'outcomes', 'outputs', 'activities', 'tasks', 'budget', 'documents'].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 className={`project-detail-tab${activeTab === tab ? ' active' : ''}`}
                 onClick={() => setActiveTab(tab)}
               >
-                {tab}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -1690,6 +1710,28 @@ const DashboardPages = ({
                 woreda={projectDetail.woreda}
               />
             </>
+          )}
+
+          {['outcomes', 'outputs', 'activities'].includes(activeTab) && selectedProject && (
+            <ProjectLogframePanel
+              tab={activeTab}
+              projectId={selectedProject.id}
+              data={projectLogframe}
+              loading={logframeLoading}
+              isManager={isManager}
+              submitting={submitting}
+              currentUserId={user?.id}
+              onRefresh={() => loadProjectLogframe(selectedProject.id, activeTab)}
+              onCreateOutcome={handleCreatePlanningOutcome}
+              onUpdateOutcome={handleUpdatePlanningOutcome}
+              onDeleteOutcome={handleDeletePlanningOutcome}
+              onCreateOutput={handleCreatePlanningOutput}
+              onUpdateOutput={handleUpdatePlanningOutput}
+              onDeleteOutput={handleDeletePlanningOutput}
+              onCreateActivity={handleCreatePlanningActivity}
+              onUpdateActivity={handleUpdatePlanningActivity}
+              onDeleteActivity={handleDeletePlanningActivity}
+            />
           )}
 
           {activeTab === 'tasks' && (
@@ -1919,40 +1961,27 @@ const DashboardPages = ({
           canEdit={isManager}
           submitting={submitting}
           onRefresh={loadPageData}
-          onSaveOrg={handleSaveConfigOrg}
           onCreateUnit={handleCreateConfigUnit}
           onDeleteUnit={handleDeleteConfigUnit}
           onCreateIndicator={handleCreateConfigIndicator}
           onDeleteIndicator={handleDeleteConfigIndicator}
-          onCreateScope={handleCreateConfigScope}
-          onDeleteScope={handleDeleteConfigScope}
-          onSaveWorkflow={handleSaveReportWorkflow}
-          showToast={showToast}
         />
       )}
 
-      {isPlanningPage(currentPage) && (
-        <PlanningModule
-          planningPage={currentPage}
-          data={planningData}
-          loading={loading && !planningData}
-          isManager={isManager}
+      {currentPage === 'staff-management' && (
+        <StaffManagementPage
+          users={users}
+          configData={configData}
+          loading={loading && !configData && !users.length}
+          canManage={canManageUsers(user)}
           submitting={submitting}
-          firstName={firstName}
-          projects={projects}
-          onNavigate={onNavigate}
-          onOpenProject={openPlanningProject}
-          onCreateProject={() => openProjectModal()}
-          onRefresh={loadPageData}
-          onCreateOutcome={handleCreatePlanningOutcome}
-          onUpdateOutcome={handleUpdatePlanningOutcome}
-          onDeleteOutcome={handleDeletePlanningOutcome}
-          onCreateOutput={handleCreatePlanningOutput}
-          onUpdateOutput={handleUpdatePlanningOutput}
-          onDeleteOutput={handleDeletePlanningOutput}
-          onCreateActivity={handleCreatePlanningActivity}
-          onUpdateActivity={handleUpdatePlanningActivity}
-          onDeleteActivity={handleDeletePlanningActivity}
+          newStaffForm={newStaffForm}
+          setNewStaffForm={setNewStaffForm}
+          onAddStaff={handleAddStaff}
+          onEditUser={(u) => { setEditUser({ ...u }); setModal('user'); }}
+          onCreateScope={handleCreateConfigScope}
+          onDeleteScope={handleDeleteConfigScope}
+          onSaveWorkflow={handleSaveReportWorkflow}
         />
       )}
 
@@ -2123,88 +2152,19 @@ const DashboardPages = ({
       {currentPage === 'settings' && (
         <>
           <div className="page-header">
-            <h1>User Management</h1>
-            <p>Manage your profile, organization settings, and staff accounts.</p>
+            <h1>Settings</h1>
+            <p>Update your profile and organization preferences.</p>
           </div>
           <ProfileSettings />
-          <div className="settings-admin-wrap">
-            {user?.role === 'admin' && organization && (
-              <div className="settings-row">
-                <div className="settings-card">
-                  <div className="settings-card-title">Organization Info</div>
-                  <p className="profile-settings-hint">Only administrators can edit organization details.</p>
-                  {['name', 'country', 'email', 'phone', 'location'].map((field) => (
-                    <div key={field} className="form-field">
-                      <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
-                      <input value={orgForm[field] || ''} onChange={(e) => setOrgForm({ ...orgForm, [field]: e.target.value })} />
-                    </div>
-                  ))}
-                  <div className="form-field"><label>Description</label><textarea value={orgForm.description || ''} onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })} /></div>
-                  <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
-                </div>
-                <div className="settings-card">
-                  <div className="settings-card-title">Date &amp; Time Configuration</div>
-                  <div className="form-field">
-                    <label>Date Format</label>
-                    <select value={orgForm.dateFormat} onChange={(e) => setOrgForm({ ...orgForm, dateFormat: e.target.value })}>
-                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label>Timezone</label>
-                    <select value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })}>
-                      <option value="Africa/Addis_Ababa">Africa/Addis Ababa (EAT)</option>
-                      <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
-                      <option value="UTC">UTC</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label>Fiscal Year Start</label>
-                    <select value={orgForm.fiscalYearStart} onChange={(e) => setOrgForm({ ...orgForm, fiscalYearStart: e.target.value })}>
-                      {['January', 'April', 'July', 'October'].map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Date Settings'}</button>
-                </div>
-              </div>
-            )}
-            {canManageUsers(user) && (
-              <div className="settings-row">
-                <div className="settings-card">
-                  <div className="settings-card-title">Add Staff Member</div>
-                  <form onSubmit={handleAddStaff}>
-                    <div className="form-row">
-                      <div className="form-field"><label>Name *</label><input required value={newStaffForm.name} onChange={(e) => setNewStaffForm({ ...newStaffForm, name: e.target.value })} /></div>
-                      <div className="form-field"><label>Email *</label><input required type="email" value={newStaffForm.email} onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })} /></div>
-                    </div>
-                    <div className="form-row">
-                      <div className="form-field"><label>Password *</label><input required type="password" value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} /></div>
-                      <div className="form-field">
-                        <label>Staff Role *</label>
-                        <select value={newStaffForm.staffRole} onChange={(e) => setNewStaffForm({ ...newStaffForm, staffRole: e.target.value })}>
-                          {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <button className="btn-primary" type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Staff'}</button>
-                  </form>
-                </div>
-                <div className="settings-card">
-                  <div className="settings-card-title">Manage Users &amp; Roles</div>
-                  <div className="settings-users-table">
-                    <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
-                    {users.map((u) => (
-                      <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
-                        <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <SettingsAdminPanel
+            orgForm={orgForm}
+            setOrgForm={setOrgForm}
+            enabledRegions={configData?.organization?.enabledRegionsList || []}
+            submitting={submitting}
+            onSaveDateTime={handleSaveOrg}
+            onSaveLocations={handleSaveLocations}
+            isAdmin={user?.role === 'admin'}
+          />
         </>
       )}
 
