@@ -91,23 +91,22 @@ export default function ReportsManagement({
 
   return (
     <div className="ngo-reports-page">
-      <div className="ngo-reports-hero">
-        <div className="ngo-reports-hero-icon">{TYPE_ICONS[reportType]}</div>
+      <div className="page-header page-header-row">
         <div>
-          <p className="ngo-reports-hero-label">Report Management</p>
+          <p className="page-section-label">Report Management</p>
           <h1>{meta.label}</h1>
-          <p className="ngo-reports-hero-desc">{meta.cadence}</p>
+          <p>{meta.cadence}</p>
         </div>
-        <button type="button" className="btn-primary ngo-reports-create-btn" onClick={onCreateReport}>
+        <button type="button" className="btn-primary" onClick={onCreateReport}>
           + New {meta.shortLabel} Report
         </button>
       </div>
 
-      <div className="ngo-reports-stats">
-        <div className="ngo-reports-stat"><span>{stats.total}</span><label>Total</label></div>
-        <div className="ngo-reports-stat"><span>{stats.draft}</span><label>Drafts</label></div>
-        <div className="ngo-reports-stat pending"><span>{stats.pending}</span><label>Pending</label></div>
-        <div className="ngo-reports-stat approved"><span>{stats.approved}</span><label>Approved</label></div>
+      <div className="bene-stats">
+        <div className="bene-card"><div className="bene-num">{stats.total}</div><div className="bene-label">Total</div></div>
+        <div className="bene-card"><div className="bene-num">{stats.draft}</div><div className="bene-label">Drafts</div></div>
+        <div className="bene-card"><div className="bene-num">{stats.pending}</div><div className="bene-label">Pending</div></div>
+        <div className="bene-card"><div className="bene-num">{stats.approved}</div><div className="bene-label">Approved</div></div>
       </div>
 
       <div className="ngo-reports-toolbar">

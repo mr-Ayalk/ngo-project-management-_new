@@ -589,6 +589,7 @@ body, button, input, select, textarea {
 
 .dark .kpi-card,
 .dark .card,
+.dark .portal-welcome-card,
 .dark .settings-card,
 .dark .kanban-card {
   background: var(--panel) !important;

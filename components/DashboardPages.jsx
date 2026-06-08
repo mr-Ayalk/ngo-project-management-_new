@@ -15,6 +15,7 @@ import ReportsManagement from '@/components/ReportsManagement';
 import ReportsApproval from '@/components/ReportsApproval';
 import ConfigurationHub from '@/components/ConfigurationHub';
 import PlanningModule from '@/components/PlanningModule';
+import AuditLogPage from '@/components/AuditLogPage';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import { isConfigPage } from '@/lib/config-pages';
 import { isPlanningPage } from '@/lib/planning-pages';
@@ -288,6 +289,11 @@ const DashboardPages = ({
         case 'messages':
           await loadLookup();
           break;
+        case 'audit-log':
+          if (user?.role === 'admin') {
+            setAuditLogs(await api.auditLogs({ limit: '200' }));
+          }
+          break;
         case 'settings': {
           const tasks = [];
           if (user?.role === 'admin') {
@@ -308,11 +314,6 @@ const DashboardPages = ({
           }
           if (canManageUsers(user)) {
             tasks.push(api.users().then(setUsers));
-          }
-          if (user?.role === 'admin') {
-            tasks.push(
-              api.auditLogs().then(setAuditLogs).catch(() => setAuditLogs([]))
-            );
           }
           await Promise.all(tasks);
           break;
@@ -1053,9 +1054,11 @@ const DashboardPages = ({
     try {
       await api.saveReportWorkflow(body);
       showToast('Report workflow updated');
-      loadPageData();
+      await loadPageData();
+      return true;
     } catch (err) {
       showToast(err.message, 'error');
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -1331,53 +1334,27 @@ const DashboardPages = ({
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
         <>
-          <div className="portal-topbar">
-            <div>
-              <p className="portal-greeting">Welcome! <strong>{firstName}</strong>,</p>
-              <p className="portal-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            </div>
-          </div>
-
           {dashboard.portal && (
-            <section className="portal-hero" style={{ '--portal-primary': dashboard.portal.primaryColor || '#2563eb' }}>
-              <div className="portal-hero-inner">
-                <div className="portal-hero-copy">
+            <section className="portal-welcome-card">
+              <div className="page-header page-header-row portal-welcome-inner">
+                <div>
+                  <p className="portal-greeting">Welcome! <strong>{firstName}</strong>,</p>
+                  <p className="portal-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                   <h1>{dashboard.portal.title}</h1>
-                  <p className="portal-hero-sub">{dashboard.portal.subtitle}</p>
-                  {dashboard.portal.tagline && <p className="portal-hero-tag">{dashboard.portal.tagline}</p>}
+                  <p className="portal-welcome-sub">{dashboard.portal.subtitle}</p>
+                  {dashboard.portal.tagline && <p className="portal-welcome-tagline">{dashboard.portal.tagline}</p>}
                 </div>
+                {isManager && (
+                  <button type="button" className="btn-primary" onClick={() => openProjectModal()}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Project
+                  </button>
+                )}
               </div>
             </section>
           )}
 
-          {(dashboard.portal?.mission || dashboard.portal?.vision || (dashboard.portal?.strategicGoals?.length > 0)) && (
-            <div className="portal-info-grid">
-              {dashboard.portal.mission && (
-                <article className="portal-info-card">
-                  <h2>Our Mission</h2>
-                  <p>{dashboard.portal.mission}</p>
-                </article>
-              )}
-              {dashboard.portal.vision && (
-                <article className="portal-info-card">
-                  <h2>Our Vision</h2>
-                  <p>{dashboard.portal.vision}</p>
-                </article>
-              )}
-              {dashboard.portal.strategicGoals?.length > 0 && (
-                <article className="portal-info-card portal-info-goals">
-                  <h2>Our Strategic Goals</h2>
-                  <ul>
-                    {dashboard.portal.strategicGoals.map((goal, i) => (
-                      <li key={i}>{goal}</li>
-                    ))}
-                  </ul>
-                </article>
-              )}
-            </div>
-          )}
-
-          <div className="page-header portal-metrics-header">
+          <div className="page-header">
             <h1>Impact Overview</h1>
             <p>Key metrics and activity across your programs and projects.</p>
           </div>
@@ -1488,8 +1465,11 @@ const DashboardPages = ({
       {/* ── PROJECTS ── */}
       {currentPage === 'projects' && projectView === 'list' && (
         <>
-          <div className="projects-topbar">
-            <div><h1>Projects</h1><p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>Manage and track all your projects.</p></div>
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Projects</h1>
+              <p>Manage and track all your projects.</p>
+            </div>
             {isManager && (
               <button className="btn-primary" onClick={() => openProjectModal()}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>
             )}
@@ -1773,8 +1753,11 @@ const DashboardPages = ({
       {/* ── BUDGET ── */}
       {currentPage === 'budget' && budget && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Budget</h1></div>
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Budget</h1>
+              <p>Track spending and utilization across active projects.</p>
+            </div>
             {(isManager || user?.staffRole === 'finance_team') && (
               <button className="btn-primary" onClick={async () => { const data = await loadLookup(); setExpenseForm({ ...EMPTY_EXPENSE, projectId: data.projects[0]?.id || '' }); setModal('expense'); }}>+ Add Expense</button>
             )}
@@ -1882,8 +1865,11 @@ const DashboardPages = ({
       {/* ── BENEFICIARIES ── */}
       {currentPage === 'beneficiaries' && beneficiaries && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Beneficiaries</h1></div>
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Beneficiaries</h1>
+              <p>Track program participants by region and status.</p>
+            </div>
             <button className="btn-primary" onClick={() => { setBeneficiaryForm(EMPTY_BENEFICIARY); setModal('beneficiary'); }}>+ Add Beneficiary</button>
           </div>
           <div className="bene-stats">
@@ -1981,8 +1967,11 @@ const DashboardPages = ({
       {/* ── PARTNERS ── */}
       {currentPage === 'partners' && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div><h1 style={{ fontSize: '20px', fontWeight: '600', fontFamily: "'DM Serif Display',serif" }}>Partners</h1></div>
+          <div className="page-header page-header-row">
+            <div>
+              <h1>Partners</h1>
+              <p>Manage institutional and community partners.</p>
+            </div>
             <button className="btn-primary" onClick={() => { setPartnerForm(EMPTY_PARTNER); setModal('partner'); }}>+ Add Partner</button>
           </div>
           <div className="partner-grid">
@@ -2015,17 +2004,35 @@ const DashboardPages = ({
         />
       )}
 
+      {/* ── AUDIT LOG ── */}
+      {currentPage === 'audit-log' && (
+        user?.role === 'admin' ? (
+          <AuditLogPage
+            logs={auditLogs}
+            loading={loading && !auditLogs.length}
+            onRefresh={loadPageData}
+          />
+        ) : (
+          <div className="page-error-banner">
+            <div className="page-error-copy">
+              <strong>Access restricted</strong>
+              <p>Audit logs are available to administrators only.</p>
+            </div>
+          </div>
+        )
+      )}
+
       {/* ── SETTINGS ── */}
       {currentPage === 'settings' && (
         <>
           <div className="page-header">
-            <h1>Settings</h1>
-            <p>Manage your profile, security, and workspace preferences.</p>
+            <h1>User Management</h1>
+            <p>Manage your profile, organization settings, and staff accounts.</p>
           </div>
           <ProfileSettings />
-          <div className="settings-grid">
+          <div className="settings-admin-wrap">
             {user?.role === 'admin' && organization && (
-              <>
+              <div className="settings-row">
                 <div className="settings-card">
                   <div className="settings-card-title">Organization Info</div>
                   <p className="profile-settings-hint">Only administrators can edit organization details.</p>
@@ -2039,7 +2046,7 @@ const DashboardPages = ({
                   <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</button>
                 </div>
                 <div className="settings-card">
-                  <div className="settings-card-title">Date & Time Configuration</div>
+                  <div className="settings-card-title">Date &amp; Time Configuration</div>
                   <div className="form-field">
                     <label>Date Format</label>
                     <select value={orgForm.dateFormat} onChange={(e) => setOrgForm({ ...orgForm, dateFormat: e.target.value })}>
@@ -2064,65 +2071,39 @@ const DashboardPages = ({
                   </div>
                   <button className="btn-primary" onClick={handleSaveOrg} disabled={submitting}>{submitting ? 'Saving...' : 'Save Date Settings'}</button>
                 </div>
-              </>
-            )}
-            {canManageUsers(user) && (
-              <div className="settings-card">
-                <div className="settings-card-title">Add Staff Member</div>
-                <form onSubmit={handleAddStaff}>
-                  <div className="form-row">
-                    <div className="form-field"><label>Name *</label><input required value={newStaffForm.name} onChange={(e) => setNewStaffForm({ ...newStaffForm, name: e.target.value })} /></div>
-                    <div className="form-field"><label>Email *</label><input required type="email" value={newStaffForm.email} onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })} /></div>
-                  </div>
-                  <div className="form-row">
-                    <div className="form-field"><label>Password *</label><input required type="password" value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} /></div>
-                    <div className="form-field">
-                      <label>Staff Role *</label>
-                      <select value={newStaffForm.staffRole} onChange={(e) => setNewStaffForm({ ...newStaffForm, staffRole: e.target.value })}>
-                        {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <button className="btn-primary" type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Staff'}</button>
-                </form>
               </div>
             )}
             {canManageUsers(user) && (
-              <div className="settings-card">
-                <div className="settings-card-title">Manage Users & Roles</div>
-                <div className="settings-users-table">
-                  <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
-                  {users.map((u) => (
-                    <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
-                      <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
+              <div className="settings-row">
+                <div className="settings-card">
+                  <div className="settings-card-title">Add Staff Member</div>
+                  <form onSubmit={handleAddStaff}>
+                    <div className="form-row">
+                      <div className="form-field"><label>Name *</label><input required value={newStaffForm.name} onChange={(e) => setNewStaffForm({ ...newStaffForm, name: e.target.value })} /></div>
+                      <div className="form-field"><label>Email *</label><input required type="email" value={newStaffForm.email} onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })} /></div>
                     </div>
-                  ))}
+                    <div className="form-row">
+                      <div className="form-field"><label>Password *</label><input required type="password" value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} /></div>
+                      <div className="form-field">
+                        <label>Staff Role *</label>
+                        <select value={newStaffForm.staffRole} onChange={(e) => setNewStaffForm({ ...newStaffForm, staffRole: e.target.value })}>
+                          {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <button className="btn-primary" type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Staff'}</button>
+                  </form>
                 </div>
-              </div>
-            )}
-            {user?.role === 'admin' && auditLogs.length > 0 && (
-              <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
-                <div className="settings-card-title">Security Audit Log</div>
-                <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>
-                  Recent administrative actions across your organization (last 100 entries).
-                </p>
-                <div className="audit-log-table">
-                  <div className="audit-log-row audit-log-head">
-                    <span>Time</span>
-                    <span>Action</span>
-                    <span>Resource</span>
-                    <span>User</span>
-                    <span>IP</span>
+                <div className="settings-card">
+                  <div className="settings-card-title">Manage Users &amp; Roles</div>
+                  <div className="settings-users-table">
+                    <div className="settings-users-head"><span>NAME</span><span>ROLE</span><span>STATUS</span></div>
+                    {users.map((u) => (
+                      <div key={u.id} className="settings-users-row" onClick={() => { setEditUser({ ...u }); setModal('user'); }}>
+                        <span>{u.name}</span><span className="settings-role">{u.roleLabel}</span><span className={u.isActive ? 'settings-active' : 'settings-inactive'}>{u.status}</span>
+                      </div>
+                    ))}
                   </div>
-                  {auditLogs.map((log) => (
-                    <div key={log.id} className="audit-log-row">
-                      <span>{new Date(log.createdAt).toLocaleString()}</span>
-                      <span className="audit-action">{log.action}</span>
-                      <span>{log.resource}</span>
-                      <span>{log.userName}</span>
-                      <span style={{ color: 'var(--gray-400)' }}>{log.ipAddress || '—'}</span>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}

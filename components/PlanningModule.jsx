@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
 import {
   getPlanningPageMeta,
   OUTCOME_STATUSES,
@@ -9,35 +8,6 @@ import {
   PLAN_ACTIVITY_STATUSES,
 } from '@/lib/planning-pages';
 import ProjectIcon from '@/components/ProjectIcon';
-import logo1 from '@/app/assets/logo1.png';
-
-const PLANNING_ICONS = {
-  projects: (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/><path d="M16 3v4M8 3v4M3 11h18"/>
-    </svg>
-  ),
-  outcomes: (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
-    </svg>
-  ),
-  outputs: (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-    </svg>
-  ),
-  activities: (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-    </svg>
-  ),
-  'my-activities': (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-    </svg>
-  ),
-};
 
 function StatusPill({ status, type = 'outcome' }) {
   return <span className={`plan-status plan-status-${type} plan-status-${status}`}>{status.replace(/_/g, ' ')}</span>;
@@ -54,14 +24,12 @@ function ProgressBar({ value }) {
 
 function PlanningHero({ pageId, children }) {
   const meta = getPlanningPageMeta(pageId);
-  const iconKey = meta?.icon || pageId?.replace('planning-', '');
   return (
-    <div className="plan-hero">
-      <div className="plan-hero-icon">{PLANNING_ICONS[iconKey] || PLANNING_ICONS.projects}</div>
-      <div className="plan-hero-copy">
-        <p className="plan-hero-label">Planning Module</p>
+    <div className="page-header page-header-row">
+      <div>
+        <p className="page-section-label">Planning Module</p>
         <h1>{meta?.label || 'Planning'}</h1>
-        <p className="plan-hero-desc">{meta?.description}</p>
+        <p>{meta?.description}</p>
       </div>
       {children}
     </div>
@@ -156,42 +124,31 @@ export default function PlanningModule({
     const stats = data?.stats;
     return (
       <div className="plan-page">
-        <div className="portal-topbar">
+        <div className="page-header page-header-row">
           <div>
-            <p className="portal-greeting">Welcome! <strong>{firstName}</strong>,</p>
-            <p className="portal-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <p className="page-section-label">Planning Module</p>
+            <h1>{portal?.title || 'Planning Overview'}</h1>
+            <p>{portal?.subtitle || 'Mission control for your LogFrame — outcomes, outputs, and activities.'}</p>
+            {portal?.tagline && <p className="page-header-note">{portal.tagline}</p>}
           </div>
         </div>
 
-        {portal && (
-          <section className="plan-landing-hero">
-            <div className="plan-landing-hero-inner">
-              <Image src={logo1} alt="" className="plan-landing-logo" width={56} height={56} />
-              <div>
-                <h1>{portal.title}</h1>
-                <p>{portal.subtitle}</p>
-                {portal.tagline && <span className="plan-landing-tag">{portal.tagline}</span>}
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className="plan-stats-row">
-          <div className="plan-stat-card">
-            <span className="plan-stat-val">{stats?.projects || 0}</span>
-            <span className="plan-stat-label">Active Projects</span>
+        <div className="bene-stats">
+          <div className="bene-card">
+            <div className="bene-num">{stats?.projects || 0}</div>
+            <div className="bene-label">Active Projects</div>
           </div>
-          <div className="plan-stat-card">
-            <span className="plan-stat-val">{stats?.outcomes || 0}</span>
-            <span className="plan-stat-label">Outcomes Defined</span>
+          <div className="bene-card">
+            <div className="bene-num">{stats?.outcomes || 0}</div>
+            <div className="bene-label">Outcomes Defined</div>
           </div>
-          <div className="plan-stat-card">
-            <span className="plan-stat-val">{stats?.outputs || 0}</span>
-            <span className="plan-stat-label">Outputs Tracked</span>
+          <div className="bene-card">
+            <div className="bene-num">{stats?.outputs || 0}</div>
+            <div className="bene-label">Outputs Tracked</div>
           </div>
-          <div className="plan-stat-card highlight">
-            <span className="plan-stat-val">{stats?.logframeProgress || 0}%</span>
-            <span className="plan-stat-label">LogFrame Progress</span>
+          <div className="bene-card">
+            <div className="bene-num">{stats?.logframeProgress || 0}%</div>
+            <div className="bene-label">LogFrame Progress</div>
           </div>
         </div>
 
@@ -250,7 +207,7 @@ export default function PlanningModule({
             ))}
             {!data?.upcomingActivities?.length && <p className="plan-empty-inline">Schedule field activities to track delivery.</p>}
           </div>
-          <div className="plan-quick-card gold" onClick={() => onNavigate?.('planning-my-activities')} role="button" tabIndex={0}>
+          <div className="plan-quick-card" onClick={() => onNavigate?.('planning-my-activities')} role="button" tabIndex={0}>
             <h3>My Activities</h3>
             <p className="plan-my-count">{stats?.myActivities || 0} assigned to you</p>
             {(data?.myUpcoming || []).slice(0, 3).map((a) => (
@@ -272,8 +229,8 @@ export default function PlanningModule({
         <PlanningHero pageId={planningPage}>
           {isManager && <button type="button" className="btn-primary" onClick={onCreateProject}>+ New Project</button>}
         </PlanningHero>
-        <div className="plan-toolbar">
-          <input className="plan-search" placeholder="Search projects…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="filter-row">
+          <input className="search-inline" type="text" placeholder="Search projects…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="plan-table">
           <div className="plan-table-head projects">
@@ -312,8 +269,8 @@ export default function PlanningModule({
             </button>
           )}
         </PlanningHero>
-        <div className="plan-toolbar">
-          <input className="plan-search" placeholder="Search outcomes…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="filter-row">
+          <input className="search-inline" placeholder="Search outcomes…" value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
             <option value="all">All Projects</option>
             {(data?.projects || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -399,8 +356,8 @@ export default function PlanningModule({
             </button>
           )}
         </PlanningHero>
-        <div className="plan-toolbar">
-          <input className="plan-search" placeholder="Search outputs…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="filter-row">
+          <input className="search-inline" placeholder="Search outputs…" value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
             <option value="all">All Projects</option>
             {(data?.projects || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -492,8 +449,8 @@ export default function PlanningModule({
           </button>
         )}
       </PlanningHero>
-      <div className="plan-toolbar">
-        <input className="plan-search" placeholder="Search activities…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="filter-row">
+        <input className="search-inline" placeholder="Search activities…" value={search} onChange={(e) => setSearch(e.target.value)} />
         {!isMine && (
           <select className="filter-select" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
             <option value="all">All Projects</option>

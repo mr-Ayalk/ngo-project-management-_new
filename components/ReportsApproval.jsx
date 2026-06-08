@@ -38,22 +38,15 @@ export default function ReportsApproval({
 
   return (
     <div className="ngo-reports-page ngo-reports-approval">
-      <div className="ngo-reports-hero">
-        <div className="ngo-reports-hero-icon approval">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="10" />
-          </svg>
-        </div>
+      <div className="page-header page-header-row">
         <div>
-          <p className="ngo-reports-hero-label">Reports</p>
+          <p className="page-section-label">Reports</p>
           <h1>Reports Approval</h1>
-          <p className="ngo-reports-hero-desc">
-            Review, approve, or return field and program reports before they are published to stakeholders.
-          </p>
+          <p>Review, approve, or return field and program reports before they are published to stakeholders.</p>
         </div>
-        <div className="ngo-reports-approval-count">
-          <span>{pending.length}</span>
-          <label>Pending Review</label>
+        <div className="bene-card" style={{ minWidth: '120px', padding: '12px 16px' }}>
+          <div className="bene-num">{pending.length}</div>
+          <div className="bene-label">Pending Review</div>
         </div>
       </div>
 

@@ -4,17 +4,164 @@ import { useMemo, useState } from 'react';
 import { getConfigPageMeta } from '@/lib/config-pages';
 import { REPORT_TYPES } from '@/lib/report-types';
 import { REGIONS, getZonesForRegion, getTownsForRegion } from '@/lib/ethiopia-locations';
-import { STAFF_ROLES } from '@/lib/roles';
 
-const ROLE_OPTIONS = [
-  { value: 'staff', label: 'Staff' },
-  { value: 'field_worker', label: 'Field Worker' },
-  { value: 'program_staff', label: 'Program Staff' },
-  { value: 'finance_team', label: 'Finance Team' },
-  { value: 'manager', label: 'Project Manager' },
-  { value: 'project_manager', label: 'Project Manager' },
-  { value: 'admin', label: 'Administrator' },
+/** Roles shown in workflow UI (manager + project_manager are one checkbox). */
+const WORKFLOW_ROLES = [
+  { value: 'staff', label: 'Staff', hint: 'General NGO staff' },
+  { value: 'field_worker', label: 'Field Worker', hint: 'Frontline / community staff' },
+  { value: 'program_staff', label: 'Program Staff', hint: 'Program officers & coordinators' },
+  { value: 'finance_team', label: 'Finance Team', hint: 'Finance & grants staff' },
+  { value: 'manager', label: 'Project Manager', hint: 'Managers who oversee projects', aliases: ['project_manager'] },
+  { value: 'admin', label: 'Administrator', hint: 'System administrators' },
 ];
+
+function expandWorkflowRoles(roles) {
+  const set = new Set(roles.filter((r) => r !== 'project_manager'));
+  if (set.has('manager')) {
+    set.add('project_manager');
+  }
+  return [...set];
+}
+
+function hasWorkflowRole(selected, roleValue) {
+  const role = WORKFLOW_ROLES.find((r) => r.value === roleValue);
+  const keys = role?.aliases ? [role.value, ...role.aliases] : [roleValue];
+  return keys.some((k) => selected.includes(k));
+}
+
+function toggleWorkflowRole(selected, roleValue) {
+  const role = WORKFLOW_ROLES.find((r) => r.value === roleValue);
+  const keys = role?.aliases ? [role.value, ...role.aliases] : [roleValue];
+  const next = new Set(selected);
+  const isOn = keys.some((k) => next.has(k));
+  keys.forEach((k) => {
+    if (isOn) next.delete(k);
+    else next.add(k);
+  });
+  return [...next];
+}
+
+function normalizeWorkflowRolesForCompare(roles) {
+  return expandWorkflowRoles(roles).sort().join(',');
+}
+
+function formatRoleList(roles) {
+  const labels = WORKFLOW_ROLES
+    .filter((r) => hasWorkflowRole(roles, r.value))
+    .map((r) => r.label);
+  return labels.length ? labels.join(', ') : 'None selected';
+}
+
+function WorkflowRoleChips({ selected, onChange, variant }) {
+  return (
+    <div className="workflow-role-chips" role="group">
+      {WORKFLOW_ROLES.map((role) => {
+        const active = hasWorkflowRole(selected, role.value);
+        return (
+          <button
+            key={role.value}
+            type="button"
+            className={`workflow-role-chip ${variant}${active ? ' active' : ''}`}
+            title={role.hint}
+            aria-pressed={active}
+            onClick={() => onChange(toggleWorkflowRole(selected, role.value))}
+          >
+            {active && <span className="workflow-role-check" aria-hidden="true">✓</span>}
+            {role.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkflowRuleCard({ rule, workflowEdits, setWorkflowEdits, submitting, onSave }) {
+  const meta = REPORT_TYPES.find((t) => t.value === rule.reportType);
+  const submitterRoles = workflowEdits[rule.reportType]?.submitterRoles ?? rule.submitterRoles;
+  const approverRoles = workflowEdits[rule.reportType]?.approverRoles ?? rule.approverRoles;
+  const isDirty = normalizeWorkflowRolesForCompare(submitterRoles) !== normalizeWorkflowRolesForCompare(rule.submitterRoles)
+    || normalizeWorkflowRolesForCompare(approverRoles) !== normalizeWorkflowRolesForCompare(rule.approverRoles);
+
+  const patchRule = (patch) => {
+    setWorkflowEdits((prev) => ({
+      ...prev,
+      [rule.reportType]: {
+        ...rule,
+        ...prev[rule.reportType],
+        submitterRoles: prev[rule.reportType]?.submitterRoles ?? rule.submitterRoles,
+        approverRoles: prev[rule.reportType]?.approverRoles ?? rule.approverRoles,
+        ...patch,
+      },
+    }));
+  };
+
+  return (
+    <article className={`workflow-rule-card${isDirty ? ' dirty' : ''}`}>
+      <header className="workflow-rule-header">
+        <div>
+          <h4>{rule.reportLabel}</h4>
+          {meta?.cadence && <p className="workflow-rule-cadence">{meta.cadence}</p>}
+        </div>
+        {isDirty && <span className="workflow-unsaved-badge">Unsaved changes</span>}
+      </header>
+
+      <div className="workflow-flow">
+        <section className="workflow-role-section">
+          <div className="workflow-role-heading">
+            <span className="workflow-role-icon reporter">1</span>
+            <div>
+              <strong>Reporters</strong>
+              <span>Who can create &amp; submit this report</span>
+            </div>
+          </div>
+          <WorkflowRoleChips
+            variant="reporter"
+            selected={submitterRoles}
+            onChange={(roles) => patchRule({ submitterRoles: roles })}
+          />
+        </section>
+
+        <div className="workflow-flow-arrow" aria-hidden="true">
+          <span>submits to</span>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </div>
+
+        <section className="workflow-role-section">
+          <div className="workflow-role-heading">
+            <span className="workflow-role-icon approver">2</span>
+            <div>
+              <strong>Approvers</strong>
+              <span>Who can review in Reports Approval</span>
+            </div>
+          </div>
+          <WorkflowRoleChips
+            variant="approver"
+            selected={approverRoles}
+            onChange={(roles) => patchRule({ approverRoles: roles })}
+          />
+        </section>
+      </div>
+
+      <footer className="workflow-rule-footer">
+        <p className="workflow-summary">
+          <strong>Summary:</strong> {formatRoleList(submitterRoles)} submit → {formatRoleList(approverRoles)} approve
+        </p>
+        <button
+          type="button"
+          className={isDirty ? 'btn-primary' : 'btn-secondary'}
+          disabled={submitting || !isDirty}
+          onClick={() => onSave({
+            reportType: rule.reportType,
+            submitterRoles: expandWorkflowRoles(submitterRoles),
+            approverRoles: expandWorkflowRoles(approverRoles),
+          })}
+        >
+          {isDirty ? 'Save changes' : 'Saved'}
+        </button>
+      </footer>
+    </article>
+  );
+}
 
 const INDICATOR_CATEGORIES = ['Impact', 'Output', 'Outcome', 'Process', 'Financial', 'Cross-cutting'];
 const DASHBOARD_WIDGETS = [
@@ -30,11 +177,11 @@ const DASHBOARD_WIDGETS = [
 function ConfigHero({ pageId, children }) {
   const meta = getConfigPageMeta(pageId);
   return (
-    <div className="config-hero">
+    <div className="page-header page-header-row">
       <div>
-        <p className="config-hero-label">Configurations</p>
+        <p className="page-section-label">Configurations</p>
         <h1>{meta?.label || 'Configuration'}</h1>
-        <p className="config-hero-desc">{meta?.description}</p>
+        <p>{meta?.description}</p>
       </div>
       {children}
     </div>
@@ -149,17 +296,26 @@ export default function ConfigurationHub({
           <ConfigHero pageId={configPage}>
             <button type="button" className="btn-secondary" onClick={onRefresh}>Refresh</button>
           </ConfigHero>
-          <div className="config-panel">
-            <h3>Add Organizational Unit</h3>
-            <div className="config-inline-form">
-              <input placeholder="Unit name *" value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
-              <input placeholder="Code" value={unitForm.code} onChange={(e) => setUnitForm({ ...unitForm, code: e.target.value })} />
-              <input placeholder="Description" value={unitForm.description} onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })} />
-              <button type="button" className="btn-primary" disabled={submitting} onClick={async () => {
-                await onCreateUnit(unitForm);
-                setUnitForm({ name: '', code: '', description: '' });
-              }}>Add Unit</button>
+          <div className="config-panel settings-card">
+            <h3 className="settings-card-title">Add Organizational Unit</h3>
+            <div className="config-form-grid three">
+              <div className="form-field">
+                <label>Unit name *</label>
+                <input value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Code</label>
+                <input value={unitForm.code} onChange={(e) => setUnitForm({ ...unitForm, code: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Description</label>
+                <input value={unitForm.description} onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })} />
+              </div>
             </div>
+            <button type="button" className="btn-primary" disabled={submitting} onClick={async () => {
+              await onCreateUnit(unitForm);
+              setUnitForm({ name: '', code: '', description: '' });
+            }}>Add Unit</button>
           </div>
           <ConfigTable head={['Unit', 'Code', 'Status', '']} empty={!data.units?.length ? 'No units configured yet. Add program areas, departments, or field offices.' : null}>
             {data.units.map((u) => (
@@ -178,17 +334,35 @@ export default function ConfigurationHub({
       {configPage === 'config-indicators' && (
         <>
           <ConfigHero pageId={configPage} />
-          <div className="config-panel">
-            <h3>Add Program Indicator</h3>
-            <div className="config-form-grid">
-              <input placeholder="Indicator name *" value={indicatorForm.name} onChange={(e) => setIndicatorForm({ ...indicatorForm, name: e.target.value })} />
-              <input placeholder="Code" value={indicatorForm.code} onChange={(e) => setIndicatorForm({ ...indicatorForm, code: e.target.value })} />
-              <select value={indicatorForm.category} onChange={(e) => setIndicatorForm({ ...indicatorForm, category: e.target.value })}>
-                {INDICATOR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <input placeholder="Unit (e.g. people, %)" value={indicatorForm.unit} onChange={(e) => setIndicatorForm({ ...indicatorForm, unit: e.target.value })} />
-              <input placeholder="Baseline" type="number" value={indicatorForm.baseline} onChange={(e) => setIndicatorForm({ ...indicatorForm, baseline: e.target.value })} />
-              <input placeholder="Target" type="number" value={indicatorForm.target} onChange={(e) => setIndicatorForm({ ...indicatorForm, target: e.target.value })} />
+          <div className="config-panel settings-card">
+            <h3 className="settings-card-title">Add Program Indicator</h3>
+            <div className="config-form-grid three">
+              <div className="form-field">
+                <label>Indicator name *</label>
+                <input value={indicatorForm.name} onChange={(e) => setIndicatorForm({ ...indicatorForm, name: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Code</label>
+                <input value={indicatorForm.code} onChange={(e) => setIndicatorForm({ ...indicatorForm, code: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Category</label>
+                <select value={indicatorForm.category} onChange={(e) => setIndicatorForm({ ...indicatorForm, category: e.target.value })}>
+                  {INDICATOR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Unit (e.g. people, %)</label>
+                <input value={indicatorForm.unit} onChange={(e) => setIndicatorForm({ ...indicatorForm, unit: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Baseline</label>
+                <input type="number" value={indicatorForm.baseline} onChange={(e) => setIndicatorForm({ ...indicatorForm, baseline: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Target</label>
+                <input type="number" value={indicatorForm.target} onChange={(e) => setIndicatorForm({ ...indicatorForm, target: e.target.value })} />
+              </div>
             </div>
             <button type="button" className="btn-primary" disabled={submitting} onClick={async () => {
               await onCreateIndicator(indicatorForm);
@@ -234,39 +408,36 @@ export default function ConfigurationHub({
       {configPage === 'config-reporter-approver' && (
         <>
           <ConfigHero pageId={configPage} />
-          <div className="config-panel">
-            <p className="config-panel-desc">Define which roles can submit and approve each report type. This governs your humanitarian reporting workflow.</p>
+          <div className="config-panel workflow-howto">
+            <h3 className="settings-card-title">How this works</h3>
+            <ol className="workflow-steps">
+              <li><strong>Reporters</strong> create and submit reports under Report Management.</li>
+              <li>Submitted reports appear as <strong>Pending Approval</strong> for the roles you choose below.</li>
+              <li><strong>Approvers</strong> review and approve or return reports in Reports Approval.</li>
+            </ol>
+            <p className="config-panel-desc workflow-howto-tip">
+              Click role chips to turn permissions on or off for each report type. Changes apply only after you click <strong>Save changes</strong> on that report card.
+            </p>
           </div>
-          <div className="config-workflow-list">
+          <div className="workflow-rules">
             {data.reportWorkflow.map((rule) => (
-              <div key={rule.reportType} className="config-workflow-card">
-                <h4>{rule.reportLabel}</h4>
-                <div className="config-form-row">
-                  <div className="form-field">
-                    <label>Submitter Roles</label>
-                    <select multiple className="config-multi-select" value={workflowEdits[rule.reportType]?.submitterRoles || rule.submitterRoles} onChange={(e) => {
-                      const vals = [...e.target.selectedOptions].map((o) => o.value);
-                      setWorkflowEdits((prev) => ({ ...prev, [rule.reportType]: { ...rule, ...prev[rule.reportType], submitterRoles: vals } }));
-                    }}>
-                      {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label>Approver Roles</label>
-                    <select multiple className="config-multi-select" value={workflowEdits[rule.reportType]?.approverRoles || rule.approverRoles} onChange={(e) => {
-                      const vals = [...e.target.selectedOptions].map((o) => o.value);
-                      setWorkflowEdits((prev) => ({ ...prev, [rule.reportType]: { ...rule, ...prev[rule.reportType], submitterRoles: prev[rule.reportType]?.submitterRoles || rule.submitterRoles, approverRoles: vals } }));
-                    }}>
-                      {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <button type="button" className="btn-secondary config-save-row" disabled={submitting} onClick={() => onSaveWorkflow({
-                    reportType: rule.reportType,
-                    submitterRoles: workflowEdits[rule.reportType]?.submitterRoles || rule.submitterRoles,
-                    approverRoles: workflowEdits[rule.reportType]?.approverRoles || rule.approverRoles,
-                  })}>Save</button>
-                </div>
-              </div>
+              <WorkflowRuleCard
+                key={rule.reportType}
+                rule={rule}
+                workflowEdits={workflowEdits}
+                setWorkflowEdits={setWorkflowEdits}
+                submitting={submitting}
+                onSave={async (body) => {
+                  const saved = await onSaveWorkflow(body);
+                  if (saved) {
+                    setWorkflowEdits((prev) => {
+                      const next = { ...prev };
+                      delete next[body.reportType];
+                      return next;
+                    });
+                  }
+                }}
+              />
             ))}
           </div>
         </>
@@ -276,23 +447,38 @@ export default function ConfigurationHub({
       {configPage === 'config-user-woreda' && (
         <>
           <ConfigHero pageId={configPage} />
-          <div className="config-panel">
-            <h3>Assign Staff to Field Scope</h3>
+          <div className="config-panel settings-card">
+            <h3 className="settings-card-title">Assign Staff to Field Scope</h3>
             <div className="config-form-grid">
-              <select value={scopeForm.userId} onChange={(e) => setScopeForm({ ...scopeForm, userId: e.target.value })}>
-                <option value="">Select staff member…</option>
-                {data.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <select value={scopeForm.region} onChange={(e) => setScopeForm({ ...scopeForm, region: e.target.value, zone: '' })}>
-                <option value="">Region</option>
-                {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <select value={scopeForm.zone} onChange={(e) => setScopeForm({ ...scopeForm, zone: e.target.value })}>
-                <option value="">Zone</option>
-                {zoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
-              </select>
-              <input placeholder="Woreda" value={scopeForm.woreda} onChange={(e) => setScopeForm({ ...scopeForm, woreda: e.target.value })} />
-              <input placeholder="Kebele" value={scopeForm.kebele} onChange={(e) => setScopeForm({ ...scopeForm, kebele: e.target.value })} />
+              <div className="form-field">
+                <label>Staff member</label>
+                <select value={scopeForm.userId} onChange={(e) => setScopeForm({ ...scopeForm, userId: e.target.value })}>
+                  <option value="">Select staff member…</option>
+                  {data.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Region</label>
+                <select value={scopeForm.region} onChange={(e) => setScopeForm({ ...scopeForm, region: e.target.value, zone: '' })}>
+                  <option value="">Select region…</option>
+                  {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Zone</label>
+                <select value={scopeForm.zone} onChange={(e) => setScopeForm({ ...scopeForm, zone: e.target.value })}>
+                  <option value="">Select zone…</option>
+                  {zoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Woreda</label>
+                <input value={scopeForm.woreda} onChange={(e) => setScopeForm({ ...scopeForm, woreda: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Kebele</label>
+                <input value={scopeForm.kebele} onChange={(e) => setScopeForm({ ...scopeForm, kebele: e.target.value })} />
+              </div>
             </div>
             <button type="button" className="btn-primary" disabled={submitting || !scopeForm.userId} onClick={async () => {
               await onCreateScope(scopeForm);
@@ -345,8 +531,9 @@ export default function ConfigurationHub({
                   <li key={i}>{g} <button type="button" onClick={() => toggleGoal(i)}>×</button></li>
                 ))}
               </ul>
-              <div className="config-inline-form">
-                <input id="new-goal-input" placeholder="Add a strategic goal…" onKeyDown={(e) => {
+              <div className="form-field">
+                <label>Add strategic goal</label>
+                <input id="new-goal-input" placeholder="Type a goal and press Enter…" onKeyDown={(e) => {
                   if (e.key === 'Enter') { e.preventDefault(); addGoal(e.target.value); e.target.value = ''; }
                 }} />
               </div>
@@ -479,7 +666,7 @@ export default function ConfigurationHub({
               { title: 'Documents & Compliance', body: 'Upload donor agreements, budgets, and audit files under Documents. Use categories for easy retrieval.' },
               { title: 'Need Help?', body: 'Contact your NGO administrator or project manager for account access, scope changes, or training sessions.' },
             ].map((item) => (
-              <article key={item.title} className="config-guide-card">
+              <article key={item.title} className="config-guide-card partner-card">
                 <h3>{item.title}</h3>
                 <p>{item.body}</p>
               </article>

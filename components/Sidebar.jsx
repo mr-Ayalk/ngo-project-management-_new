@@ -18,24 +18,26 @@ const Sidebar = ({
   myTaskCount = 0,
   pendingApprovalCount = 0,
 }) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [reportsExpanded, setReportsExpanded] = useState(true);
   const [configExpanded, setConfigExpanded] = useState(true);
   const [planningExpanded, setPlanningExpanded] = useState(true);
 
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { id: 'projects', label: 'Projects', icon: 'projects' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'budget', label: 'Budget', icon: 'budget' },
   ];
 
   const manageNav = [
-    { id: 'partners', label: 'Partners', icon: 'partners' },
     { id: 'beneficiaries', label: 'Beneficiaries', icon: 'beneficiaries' },
+    { id: 'partners', label: 'Partners', icon: 'partners' },
     { id: 'documents', label: 'Documents', icon: 'documents' },
     { id: 'logistics', label: 'Logistics', icon: 'logistics' },
-    { id: 'messages', label: 'Inbox', icon: 'messages' },
   ];
+
+  const isAdmin = user?.role === 'admin';
 
   const isReportPage = (id) => id === currentPage || (id === 'reports-overview' && currentPage === 'reports');
 
@@ -145,17 +147,6 @@ const Sidebar = ({
   const configGroupActive = currentPage.startsWith('config-');
   const planningGroupActive = currentPage === 'planning' || currentPage.startsWith('planning-');
 
-  const planningSubIcon = (pageId) => {
-    const icons = {
-      'planning-projects': '📁',
-      'planning-outcomes': '🎯',
-      'planning-outputs': '📦',
-      'planning-activities': '✅',
-      'planning-my-activities': '👤',
-    };
-    return icons[pageId] || '•';
-  };
-
   const configSubIcon = (pageId) => {
     const icons = {
       'config-units': '◫',
@@ -185,18 +176,6 @@ const Sidebar = ({
         <nav className="nav">
           <div className="nav-section-label">Menu</div>
           {mainNav.map(renderNavItem)}
-          <div
-            className={`nav-item${currentPage === 'settings' ? ' active' : ''}`}
-            onClick={() => onPageChange('settings')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onPageChange('settings')}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-            </svg>
-            User Management
-          </div>
 
           <div className="nav-section-label">Planning Module</div>
           <div className={`nav-group${planningExpanded ? ' open' : ''}${planningGroupActive ? ' active-group' : ''}`}>
@@ -213,23 +192,21 @@ const Sidebar = ({
               </svg>
             </button>
             {planningExpanded && (
-              <div className="nav-sub-list plan-sub-list">
+              <div className="nav-sub-list">
                 <button
                   type="button"
-                  className={`nav-sub-item plan-sub-item${currentPage === 'planning' ? ' active' : ''}`}
+                  className={`nav-sub-item${currentPage === 'planning' ? ' active' : ''}`}
                   onClick={() => onPageChange('planning')}
                 >
-                  <span className="plan-sub-icon" aria-hidden="true">⌂</span>
                   Overview
                 </button>
                 {PLANNING_PAGES.map((page) => (
                   <button
                     key={page.id}
                     type="button"
-                    className={`nav-sub-item plan-sub-item${currentPage === page.id ? ' active' : ''}`}
+                    className={`nav-sub-item${currentPage === page.id ? ' active' : ''}`}
                     onClick={() => onPageChange(page.id)}
                   >
-                    <span className="plan-sub-icon" aria-hidden="true">{planningSubIcon(page.id)}</span>
                     {page.label}
                   </button>
                 ))}
@@ -288,6 +265,49 @@ const Sidebar = ({
             )}
           </div>
 
+          <div className="nav-section-label">Manage</div>
+          {manageNav.map(renderNavItem)}
+          <div
+            className={`nav-item${currentPage === 'messages' ? ' active' : ''}`}
+            onClick={() => onPageChange('messages')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('messages')}
+          >
+            {renderIcon('messages')}
+            Inbox
+          </div>
+          <div
+            className={`nav-item${currentPage === 'config-guide' ? ' active' : ''}`}
+            onClick={() => onPageChange('config-guide')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('config-guide')}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            </svg>
+            User Guide
+          </div>
+          {isAdmin && (
+            <div
+              className={`nav-item${currentPage === 'audit-log' ? ' active' : ''}`}
+              onClick={() => onPageChange('audit-log')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onPageChange('audit-log')}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              Audit Log
+            </div>
+          )}
+
           <div className="nav-section-label">M &amp; E</div>
           <div
             className={`nav-item${currentPage === 'config-indicators' ? ' active' : ''}`}
@@ -300,16 +320,6 @@ const Sidebar = ({
               <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
             </svg>
             M &amp; E Module
-          </div>
-          <div
-            className={`nav-item${currentPage === 'messages' ? ' active' : ''}`}
-            onClick={() => onPageChange('messages')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onPageChange('messages')}
-          >
-            {renderIcon('messages')}
-            Notifications
           </div>
 
           <div className="nav-section-label">Configurations</div>
@@ -359,26 +369,18 @@ const Sidebar = ({
             </div>
           ))}
 
-          <div className="nav-section-label">Guide</div>
-          {CONFIG_EXTRA.filter((p) => p.id === 'config-guide').map((page) => (
-            <div
-              key={page.id}
-              className={`nav-item${currentPage === page.id ? ' active' : ''}`}
-              onClick={() => onPageChange(page.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onPageChange(page.id)}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-              </svg>
-              {page.label}
-            </div>
-          ))}
-
-          <div className="nav-section-label">Manage</div>
-          {manageNav.map(renderNavItem)}
+          <div
+            className={`nav-item${currentPage === 'settings' ? ' active' : ''}`}
+            onClick={() => onPageChange('settings')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onPageChange('settings')}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            User Management
+          </div>
         </nav>
 
         {pinnedProjects.length > 0 && (

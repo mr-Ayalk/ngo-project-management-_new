@@ -631,6 +631,18 @@ async function main() {
     await prisma.logisticsShipment.create({ data: s });
   }
 
+  const auditNow = Date.now();
+  await prisma.auditLog.createMany({
+    data: [
+      { userId: admin.id, action: 'organization.update', resource: 'organization', details: JSON.stringify({ field: 'landingTitle' }), ipAddress: '192.168.1.10', createdAt: new Date(auditNow - 86400000 * 2) },
+      { userId: admin.id, action: 'user.create', resource: 'user', details: JSON.stringify({ email: 'james.k@engagenow.org' }), ipAddress: '192.168.1.10', createdAt: new Date(auditNow - 86400000) },
+      { userId: jane.id, action: 'user.update', resource: 'user', details: JSON.stringify({ role: 'manager' }), ipAddress: '10.0.0.42', createdAt: new Date(auditNow - 43200000) },
+      { userId: admin.id, action: 'profile.update', resource: 'profile', details: JSON.stringify({ fields: ['phone', 'bio'] }), ipAddress: '192.168.1.10', createdAt: new Date(auditNow - 3600000) },
+      { userId: grace.id, action: 'logistics.create', resource: 'logistics', details: JSON.stringify({ reference: 'SHP-240501' }), ipAddress: '10.0.0.18', createdAt: new Date(auditNow - 1800000) },
+      { userId: admin.id, action: 'user.login', resource: 'auth', details: JSON.stringify({ method: 'password' }), ipAddress: '192.168.1.10', createdAt: new Date(auditNow - 600000) },
+    ],
+  });
+
   console.log('Seed completed successfully!');
   console.log('Login credentials: ayalkbet@bamah.com / 123456789');
 }

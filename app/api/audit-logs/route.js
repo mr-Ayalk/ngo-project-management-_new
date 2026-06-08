@@ -8,14 +8,36 @@ export async function GET(req) {
     const auth = await requireAdmin(req);
     if (auth.error) return auth.error;
 
+    const { searchParams } = new URL(req.url);
+    const action = searchParams.get('action');
+    const resource = searchParams.get('resource');
+    const search = searchParams.get('search');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '200', 10), 500);
+
+    const where = {};
+    if (action && action !== 'all') where.action = action;
+    if (resource && resource !== 'all') where.resource = resource;
+
     const logs = await prisma.auditLog.findMany({
-      take: 100,
+      where,
+      take: limit,
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
 
+    let result = logs;
+    if (search) {
+      const q = search.toLowerCase();
+      result = logs.filter(
+        (log) => log.user.name.toLowerCase().includes(q)
+          || log.user.email.toLowerCase().includes(q)
+          || log.action.toLowerCase().includes(q)
+          || log.resource.toLowerCase().includes(q)
+      );
+    }
+
     return json(
-      logs.map((log) => ({
+      result.map((log) => ({
         id: log.id,
         action: log.action,
         resource: log.resource,
