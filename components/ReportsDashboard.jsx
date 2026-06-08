@@ -75,10 +75,10 @@ export default function ReportsDashboard({
                 <path d="M18 20V10M12 20V4M6 20v-6" />
               </svg>
             </span>
-            <h1>Reports Dashboard</h1>
+            <h1>M&amp;E Module</h1>
           </div>
           <p className="reports-dash-subtitle">
-            Aggregate country-level budget utilization and strategic impact KPI performance metrics.
+            Monitoring and evaluation — budget utilization, impact targets, and strategic performance metrics.
           </p>
         </div>
         <div className="reports-dash-actions">
@@ -144,7 +144,7 @@ export default function ReportsDashboard({
             </svg>
           </div>
           <div>
-            <div className="reports-kpi-label">KPI Target Progress</div>
+            <div className="reports-kpi-label">Impact Target Progress</div>
             <div className="reports-kpi-value">{summary.kpiProgressPct}%</div>
             <div className="reports-kpi-sub">Across {summary.kpiTargetCount} global targets</div>
           </div>
@@ -166,7 +166,7 @@ export default function ReportsDashboard({
               className={`reports-tab${activeTab === 'impact' ? ' active' : ''}`}
               onClick={() => setActiveTab('impact')}
             >
-              Impact KPIs
+              Impact Target
             </button>
             <button
               type="button"
@@ -243,6 +243,7 @@ export default function ReportsDashboard({
               <span>Project / Program</span>
               <span>Region</span>
               <span>Progress</span>
+              <span>Target</span>
               <span>Beneficiaries</span>
               <span>Status</span>
             </div>
@@ -259,6 +260,7 @@ export default function ReportsDashboard({
                     </div>
                     <span>{row.progress}%</span>
                   </span>
+                  <span>{row.target != null ? `${row.target}%` : '—'}</span>
                   <span>{row.beneficiaries.toLocaleString()}</span>
                   <span>
                     <span className={`reports-status-pill status-${row.status}`}>{row.statusLabel}</span>

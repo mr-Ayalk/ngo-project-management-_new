@@ -28,6 +28,7 @@ const Sidebar = ({
     ...(canManageUsers(user) ? [{ id: 'staff-management', label: 'Staff Management', icon: 'staff' }] : []),
     { id: 'units', label: 'Units', icon: 'units' },
     { id: 'indicators', label: 'Indicators', icon: 'indicators' },
+    { id: 'reports-overview', label: 'M&E Module', icon: 'me' },
   ];
 
   const manageNav = [
@@ -38,7 +39,6 @@ const Sidebar = ({
   ];
 
   const isAdmin = user?.role === 'admin';
-  const isReportPage = (id) => id === currentPage || (id === 'reports-overview' && currentPage === 'reports');
 
   const renderIcon = (type) => {
     const icons = {
@@ -88,6 +88,11 @@ const Sidebar = ({
       indicators: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      ),
+      me: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path d="M18 20V10M12 20V4M6 20v-6"/>
         </svg>
       ),
       reports: (
@@ -156,7 +161,7 @@ const Sidebar = ({
     </div>
   );
 
-  const reportGroupActive = currentPage.startsWith('reports-') || currentPage === 'reports';
+  const reportGroupActive = (currentPage.startsWith('reports-') && currentPage !== 'reports-overview' && currentPage !== 'reports-approval') || currentPage === 'reports';
 
   return (
     <aside className={`sidebar${isOpen ? ' open mobile-drawer' : ''}`}>
@@ -189,13 +194,6 @@ const Sidebar = ({
             </button>
             {reportsExpanded && (
               <div className="nav-sub-list">
-                <button
-                  type="button"
-                  className={`nav-sub-item${isReportPage('reports-overview') ? ' active' : ''}`}
-                  onClick={() => onPageChange('reports-overview')}
-                >
-                  Overview &amp; Analytics
-                </button>
                 {REPORT_TYPES.map((t) => (
                   <button
                     key={t.value}
