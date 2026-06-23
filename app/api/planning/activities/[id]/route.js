@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
-import { assertProjectAccess } from '@/lib/project-access';
+import { assertProjectAccess, userCanManageProject } from '@/lib/project-access';
 import { formatPlanActivity } from '@/lib/planning';
 
 export async function PUT(req, { params }) {
@@ -18,7 +18,11 @@ export async function PUT(req, { params }) {
 
     const body = await parseBody(req);
     const isAssignee = existing.assigneeId === auth.user.id;
-    const isManager = ['admin', 'manager', 'project_manager'].includes(auth.user.role);
+    const project = await prisma.project.findUnique({
+      where: { id: existing.projectId },
+      select: { managerId: true, leadId: true },
+    });
+    const isManager = userCanManageProject(auth.user, project);
 
     if (!isManager && !isAssignee) return error('Access denied', 403);
 

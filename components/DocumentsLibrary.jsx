@@ -1,50 +1,15 @@
 'use client';
 
-const GRAY_CARD_BG = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-
-function getFileStyle(doc) {
+function coverImage(doc) {
+  if (doc.thumbnailUrl) return doc.thumbnailUrl;
   const type = (doc.fileType || '').toUpperCase();
-  const label = type === 'DOCX' ? 'DOC' : type === 'XLSX' ? 'XLS' : type || 'FILE';
-  return { bg: GRAY_CARD_BG, label: label || 'FILE' };
+  if (['PNG', 'JPEG', 'JPG', 'WEBP'].includes(type) && doc.url && doc.url !== '#') return doc.url;
+  return null;
 }
 
-function FileTypeIcon({ type }) {
-  const t = (type || '').toUpperCase();
-  if (t === 'PDF') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-      </svg>
-    );
-  }
-  if (t === 'XLS' || t === 'XLSX' || t === 'CSV') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <line x1="3" y1="9" x2="21" y2="9" />
-        <line x1="3" y1="15" x2="21" y2="15" />
-        <line x1="9" y1="3" x2="9" y2="21" />
-      </svg>
-    );
-  }
-  if (t === 'PNG' || t === 'JPG' || t === 'JPEG' || t === 'IMG') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-    </svg>
-  );
+function FileTypeBadge({ type }) {
+  const t = (type || 'FILE').toUpperCase();
+  return <span className="docs-card-type">{t === 'DOCX' ? 'DOC' : t === 'XLSX' ? 'XLS' : t}</span>;
 }
 
 export default function DocumentsLibrary({
@@ -104,12 +69,7 @@ export default function DocumentsLibrary({
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-          />
+          <input type="text" placeholder="Search documents..." value={searchQuery} onChange={(e) => onSearchChange?.(e.target.value)} spellCheck lang="en" />
         </div>
       </div>
 
@@ -127,21 +87,28 @@ export default function DocumentsLibrary({
       ) : (
         <div className="docs-masonry">
           {filtered.map((doc) => {
-            const style = getFileStyle(doc);
+            const cover = coverImage(doc);
             return (
               <article key={doc.id} className="docs-card">
-                <div className="docs-card-preview" style={{ background: style.bg }}>
-                  <span className="docs-card-type">{style.label}</span>
-                  <span className="docs-card-icon">
-                    <FileTypeIcon type={doc.fileType} />
-                  </span>
+                <div className={`docs-card-preview${cover ? ' has-cover' : ''}`}>
+                  {cover ? (
+                    <img src={cover} alt="" className="docs-cover-img" loading="lazy" />
+                  ) : (
+                    <div className="docs-card-fallback">
+                      <span className="docs-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </span>
+                    </div>
+                  )}
+                  <FileTypeBadge type={doc.fileType} />
                 </div>
                 <div className="docs-card-body">
                   <h3 className="docs-card-title" title={doc.name}>{doc.name}</h3>
                   <div className="docs-card-meta">
-                    {doc.category && (
-                      <span className="docs-tag">{doc.category}</span>
-                    )}
+                    {doc.category && <span className="docs-tag">{doc.category}</span>}
                     {doc.size && <span className="docs-size">{doc.size}</span>}
                   </div>
                   <p className="docs-card-date">{doc.date}</p>

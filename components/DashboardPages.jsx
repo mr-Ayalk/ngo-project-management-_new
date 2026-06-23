@@ -26,7 +26,8 @@ import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/compon
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
-import { isProjectManager, canManageUsers, STAFF_ROLES } from '@/lib/roles';
+import { isDean, isProjectManager, canManageUsers, canCreateProjects, userLeadsProject, ASSIGNABLE_ROLES, STAFF_ROLES, MANAGER_PICKER_ROLES } from '@/lib/roles';
+import { resolveDocumentThumbnail } from '@/lib/pdf-thumbnail';
 import { formatBudgetInput } from '@/lib/ethiopia-locations';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { BENEFICIARY_STATUSES } from '@/lib/beneficiary-status';
@@ -40,7 +41,7 @@ function ErrorMsg({ message }) {
 }
 
 const EMPTY_PROJECT = EMPTY_PROJECT_FORM;
-const EMPTY_TASK = { title: '', projectId: '', priority: 'medium', status: 'todo', dueDate: '' };
+const EMPTY_TASK = { title: '', projectId: '', priority: 'medium', status: 'todo', startDate: '', endDate: '', dueDate: '' };
 const EMPTY_EVENT = { title: '', date: '', time: '', color: 'green', allDay: false, projectId: '' };
 const EMPTY_EXPENSE = { projectId: '', amount: '', category: 'operations' };
 const EMPTY_BENEFICIARY = { name: '', email: '', program: '', region: '', status: 'active' };
@@ -100,7 +101,7 @@ function KanbanBoard({ tasks, draggedTask, dropTarget, onDragStart, onDragOver, 
                   {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                 </span>
                 <span className="card-due" style={task.done ? { color: 'var(--green)' } : {}}>
-                  {task.done ? 'Done' : task.date}
+                  {task.done ? 'Done' : (task.dateRange || task.date || 'No dates')}
                 </span>
               </div>
             </div>
@@ -121,6 +122,7 @@ const DashboardPages = ({
   onReportsChange,
 }) => {
   const { user } = useAuth();
+  const isDeanUser = isDean(user);
   const isManager = isProjectManager(user);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -205,6 +207,13 @@ const DashboardPages = ({
     if (type === 'error') toast.error(message);
     else toast.success(message);
   }, []);
+
+  const canManageCurrentProject = selectedProject
+    ? userLeadsProject(user, {
+      managerId: projectDetail?.managerId ?? selectedProject.managerId,
+      leadId: projectDetail?.leadId ?? selectedProject.leadId,
+    })
+    : isDeanUser;
 
   const closeModal = () => {
     setModal(null);
@@ -295,12 +304,12 @@ const DashboardPages = ({
           await loadLookup();
           break;
         case 'audit-log':
-          if (user?.role === 'admin') {
+          if (isDean(user)) {
             setAuditLogs(await api.auditLogs({ limit: '200' }));
           }
           break;
         case 'settings': {
-          if (user?.role === 'admin') {
+          if (isDean(user)) {
             const [org, config] = await Promise.all([api.organization(), api.config()]);
             setOrganization(org);
             setConfigData(config);
@@ -576,7 +585,7 @@ const DashboardPages = ({
 
   const openProjectModal = async (project = null) => {
     const data = await loadLookup();
-    const defaultManager = data.users.find((u) => ['manager', 'project_manager', 'admin'].includes(u.role)) || data.users[0];
+    const defaultManager = data.users.find((u) => MANAGER_PICKER_ROLES.includes(u.role)) || data.users[0];
     if (project) {
       let detail = project;
       if (project.id && !project.assumptions) {
@@ -625,6 +634,12 @@ const DashboardPages = ({
         projectId: task.projectId || data.projects.find((p) => p.name === task.project)?.id || '',
         priority: task.priority,
         status: task.status || task.column,
+        startDate: task.startDate ? new Date(task.startDate).toISOString().slice(0, 10) : '',
+        endDate: task.endDate
+          ? new Date(task.endDate).toISOString().slice(0, 10)
+          : task.dueDate
+            ? new Date(task.dueDate).toISOString().slice(0, 10)
+            : '',
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : '',
       });
     } else {
@@ -638,7 +653,10 @@ const DashboardPages = ({
 
   const handleSaveProject = async (e) => {
     e.preventDefault();
-    if (!isManager) { showToast('Only project managers can create projects', 'error'); return; }
+    if (!canCreateProjects(user) && !projectForm.id) {
+      showToast('Only the General Country Dean can create new projects', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -745,7 +763,9 @@ const DashboardPages = ({
         projectId: taskForm.projectId,
         priority: taskForm.priority,
         status: taskForm.status,
-        dueDate: taskForm.dueDate || null,
+        startDate: taskForm.startDate || null,
+        endDate: taskForm.endDate || taskForm.dueDate || null,
+        dueDate: taskForm.endDate || taskForm.dueDate || null,
       };
       if (taskForm.id) {
         await api.updateTask(taskForm.id, body);
@@ -876,10 +896,12 @@ const DashboardPages = ({
     }
     setSubmitting(true);
     try {
-      const uploaded = await api.uploadDocumentFile(documentFile);
+      const thumbMeta = await resolveDocumentThumbnail(documentFile);
+      const uploaded = await api.uploadDocumentFile(documentFile, thumbMeta?.blob || null);
       await api.createDocument({
         name: documentForm.name || uploaded.name,
         url: uploaded.url,
+        thumbnailUrl: uploaded.thumbnailUrl || (thumbMeta?.useFileUrl ? uploaded.url : null),
         fileType: uploaded.fileType || documentForm.fileType,
         category: documentForm.category,
         size: uploaded.size || documentForm.size,
@@ -1435,7 +1457,7 @@ const DashboardPages = ({
               <h1>Welcome, {firstName}</h1>
               <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             </div>
-            {isManager && (
+            {canCreateProjects(user) && (
               <button type="button" className="btn-primary" onClick={() => openProjectModal()}>
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 New Project
@@ -1566,7 +1588,7 @@ const DashboardPages = ({
               <h1>Projects</h1>
               <p>Manage and track all your projects.</p>
             </div>
-            {isManager && (
+            {canCreateProjects(user) && (
               <button className="btn-primary" onClick={() => openProjectModal()}><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Project</button>
             )}
           </div>
@@ -1599,7 +1621,7 @@ const DashboardPages = ({
                     {menuOpen === proj.id && (
                       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => { openProjectDetail(proj); setMenuOpen(null); }} disabled={proj.hasAccess === false}>View</button>
-                        {isManager && <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>}
+                        {canManageCurrentProject && userLeadsProject(user, proj) && <button onClick={() => { openProjectModal(proj); setMenuOpen(null); }}>Edit</button>}
                         <button onClick={async () => {
                           const pinned = pinnedProjects.some((p) => p.projectId === proj.id);
                           if (pinned) await api.unpinProject(proj.id); else await api.pinProject(proj.id);
@@ -1607,7 +1629,7 @@ const DashboardPages = ({
                           setMenuOpen(null);
                           showToast(pinned ? 'Unpinned' : 'Pinned to sidebar');
                         }}>{pinnedProjects.some((p) => p.projectId === proj.id) ? 'Unpin' : 'Pin to Sidebar'}</button>
-                        {isManager && <button className="danger" onClick={() => handleDeleteProject(proj.id)}>Delete</button>}
+                        {(isDeanUser || userLeadsProject(user, proj)) && <button className="danger" onClick={() => handleDeleteProject(proj.id)}>Delete</button>}
                       </div>
                     )}
                   </span>
@@ -1648,8 +1670,8 @@ const DashboardPages = ({
               <button className={`btn-secondary pin-btn${isPinned ? ' pinned' : ''}`} onClick={handleTogglePin}>
                 {isPinned ? '★ Pinned' : '☆ Pin Project'}
               </button>
-              {isManager && <button className="btn-secondary" onClick={() => openProjectModal(selectedProject)}>Edit Project</button>}
-              {activeTab === 'tasks' && (
+              {canManageCurrentProject && <button className="btn-secondary" onClick={() => openProjectModal(selectedProject)}>Edit Project</button>}
+              {activeTab === 'tasks' && canManageCurrentProject && (
                 <button className="btn-primary" onClick={() => openTaskModal({ projectId: selectedProject.id, project: selectedProject.name })}>
                   + New Task
                 </button>
@@ -1718,7 +1740,7 @@ const DashboardPages = ({
               projectId={selectedProject.id}
               data={projectLogframe}
               loading={logframeLoading}
-              isManager={isManager}
+              isManager={canManageCurrentProject}
               submitting={submitting}
               currentUserId={user?.id}
               onRefresh={() => loadProjectLogframe(selectedProject.id, activeTab)}
@@ -1958,7 +1980,7 @@ const DashboardPages = ({
           configPage={currentPage}
           data={configData}
           loading={loading && !configData}
-          canEdit={isManager}
+          canEdit={isDeanUser}
           submitting={submitting}
           onRefresh={loadPageData}
           onCreateUnit={handleCreateConfigUnit}
@@ -2132,7 +2154,7 @@ const DashboardPages = ({
 
       {/* ── AUDIT LOG ── */}
       {currentPage === 'audit-log' && (
-        user?.role === 'admin' ? (
+        isDeanUser ? (
           <AuditLogPage
             logs={auditLogs}
             loading={loading && !auditLogs.length}
@@ -2163,7 +2185,7 @@ const DashboardPages = ({
             submitting={submitting}
             onSaveDateTime={handleSaveOrg}
             onSaveLocations={handleSaveLocations}
-            isAdmin={user?.role === 'admin'}
+            isAdmin={isDeanUser}
           />
         </>
       )}
@@ -2188,7 +2210,10 @@ const DashboardPages = ({
             <div className="form-field"><label>Priority</label><select value={taskForm.priority} onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
             <div className="form-field"><label>Status</label><select value={taskForm.status} onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}><option value="todo">To Do</option><option value="in_progress">In Progress</option><option value="completed">Completed</option></select></div>
           </div>
-          <div className="form-field"><label>Due Date</label><input type="date" value={taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })} /></div>
+          <div className="form-row">
+            <div className="form-field"><label>Start Date</label><input type="date" name="taskStartDate" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} /></div>
+            <div className="form-field"><label>End Date</label><input type="date" name="taskEndDate" value={taskForm.endDate || taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, endDate: e.target.value, dueDate: e.target.value })} /></div>
+          </div>
           <div className="form-actions">
             {taskForm.id && (
               <button
@@ -2504,11 +2529,7 @@ const DashboardPages = ({
             <div className="form-field">
               <label>Role</label>
               <select value={editUser.role} onChange={(e) => setEditUser({ ...editUser, role: e.target.value })} disabled={!canManageUsers(user)}>
-                <option value="admin">Administrator</option>
-                <option value="project_manager">Project Manager</option>
-                <option value="manager">Project Manager</option>
-                <option value="staff">Staff</option>
-                <option value="donor">Donor</option>
+                {ASSIGNABLE_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             {editUser.role === 'staff' && canManageUsers(user) && (

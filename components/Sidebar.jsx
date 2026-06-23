@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { REPORT_TYPES } from '@/lib/report-types';
-import { canManageUsers } from '@/lib/roles';
+import { canManageUsers, isDean } from '@/lib/roles';
 import logo1 from '@/app/assets/logo1.png';
 
 const Sidebar = ({
@@ -38,7 +38,7 @@ const Sidebar = ({
     { id: 'logistics', label: 'Logistics', icon: 'logistics' },
   ];
 
-  const isAdmin = user?.role === 'admin';
+  const isDeanUser = isDean(user);
 
   const renderIcon = (type) => {
     const icons = {
@@ -234,7 +234,7 @@ const Sidebar = ({
             {renderIcon('messages')}
             Inbox
           </div>
-          {isAdmin && (
+          {isDeanUser && (
             <div
               className={`nav-item${currentPage === 'audit-log' ? ' active' : ''}`}
               onClick={() => onPageChange('audit-log')}

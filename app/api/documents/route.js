@@ -17,6 +17,7 @@ function formatDocument(d) {
     uploaded: formatDate(d.uploadedAt),
     size: d.size,
     url: d.url,
+    thumbnailUrl: d.thumbnailUrl || null,
   };
 }
 
@@ -60,6 +61,7 @@ export async function POST(req) {
       data: {
         name: body.name,
         url: body.url || '#',
+        thumbnailUrl: body.thumbnailUrl || null,
         fileType: body.fileType,
         category: body.category,
         size: body.size,

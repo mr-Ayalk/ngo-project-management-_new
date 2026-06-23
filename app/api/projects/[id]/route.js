@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, formatCurrency, requireAuth } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
+import { assertProjectManageAccess } from '@/lib/project-access';
 import { assertProjectAccess } from '@/lib/project-access';
 
 export async function GET(req, { params }) {
@@ -95,9 +96,12 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const auth = await requireManager(req);
+    const auth = await requireAuth(req);
     if (auth.error) return auth.error;
     const user = auth.user;
+
+    const canManage = await assertProjectManageAccess(auth.user, params.id);
+    if (!canManage) return error('You do not have permission to edit this project', 403);
 
     const body = await parseBody(req);
     const data = {};

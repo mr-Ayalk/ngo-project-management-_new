@@ -291,8 +291,12 @@ export default function TaskDetailView({ task, project, onBack, currentUser, onN
               </span>
             </div>
             <div className="task-meta-row">
-              <span className="task-meta-label">Due</span>
-              <span className="task-meta-val">📅 {formatDate(task.dueDate)}</span>
+              <span className="task-meta-label">Start</span>
+              <span className="task-meta-val">📅 {formatDate(task.startDate)}</span>
+            </div>
+            <div className="task-meta-row">
+              <span className="task-meta-label">End</span>
+              <span className="task-meta-val">📅 {formatDate(task.endDate || task.dueDate)}</span>
             </div>
           </div>
 

@@ -28,20 +28,23 @@ const NEW_PASSWORD = process.argv[3] || '123456789';
 
 async function main() {
   const prisma = new PrismaClient();
+  const email = ADMIN_EMAIL.toLowerCase().trim();
   try {
     const hash = await bcrypt.hash(NEW_PASSWORD, 10);
-    const user = await prisma.user.update({
-      where: { email: ADMIN_EMAIL.toLowerCase().trim() },
-      data: { password: hash, isActive: true },
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: { password: hash, isActive: true },
+      create: {
+        email,
+        name: 'Ayalkbet Teketel',
+        password: hash,
+        role: 'dean',
+        isActive: true,
+        joinedDate: new Date(),
+      },
       select: { email: true, name: true, role: true },
     });
-    console.log(`Password updated for ${user.name} (${user.email})`);
-  } catch (err) {
-    if (err.code === 'P2025') {
-      console.error(`No user found with email: ${ADMIN_EMAIL}`);
-      process.exit(1);
-    }
-    throw err;
+    console.log(`Account ready for ${user.name} (${user.email}) with password: ${NEW_PASSWORD}`);
   } finally {
     await prisma.$disconnect();
   }

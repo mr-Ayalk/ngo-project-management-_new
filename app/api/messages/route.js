@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
 import { assertProjectAccess } from '@/lib/project-access';
+import { LEADER_ROLE_DB_VALUES } from '@/lib/roles';
 
 async function collectMessageRecipients(projectId, senderId, taskId = null) {
   const [members, project, admins, task] = await Promise.all([
@@ -15,7 +16,7 @@ async function collectMessageRecipients(projectId, senderId, taskId = null) {
       select: { name: true, managerId: true, leadId: true },
     }),
     prisma.user.findMany({
-      where: { role: { in: ['admin', 'manager', 'project_manager'] }, isActive: true },
+      where: { role: { in: LEADER_ROLE_DB_VALUES }, isActive: true },
       select: { id: true },
     }),
     taskId

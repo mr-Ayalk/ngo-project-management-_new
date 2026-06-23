@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
-import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireManager } from '@/lib/api-utils';
+import { json, error, parseBody, formatDate, formatCurrency, requireAuth, requireDean } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
-import { userCanAccessProject } from '@/lib/project-access';
+import { userCanAccessProject, assertProjectManageAccess } from '@/lib/project-access';
 
 function formatProject(p, user) {
   const hasAccess = userCanAccessProject(user, {
@@ -88,7 +88,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const auth = await requireManager(req);
+    const auth = await requireDean(req);
     if (auth.error) return auth.error;
     const user = auth.user;
 

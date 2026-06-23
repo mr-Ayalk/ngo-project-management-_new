@@ -270,6 +270,8 @@ model Task {
   description String?
   status      String        @default("todo")
   priority    String        @default("medium")
+  startDate   DateTime?
+  endDate     DateTime?
   dueDate     DateTime?
   projectId   String
   assigneeId  String?
@@ -352,8 +354,9 @@ model Document {
   id         String   @id @default(cuid())
   projectId  String?
   name       String
-  url        String   @default("#")
-  fileType   String?
+  url          String   @default("#")
+  thumbnailUrl String?
+  fileType     String?
   category   String?
   size       String?
   icon       String?

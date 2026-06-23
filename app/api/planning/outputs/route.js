@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
 import { assertProjectAccess } from '@/lib/project-access';
+import { hasLeadershipRole } from '@/lib/roles';
 import { formatOutput } from '@/lib/planning';
 
 export async function GET(req) {
@@ -21,7 +22,7 @@ export async function GET(req) {
       where.projectId = projectId;
     } else if (outcomeId) {
       where.outcomeId = outcomeId;
-    } else if (!['admin', 'manager', 'project_manager'].includes(auth.user.role)) {
+    } else if (!hasLeadershipRole(auth.user)) {
       const projects = await prisma.project.findMany({
         where: {
           OR: [

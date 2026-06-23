@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, requireAuth } from '@/lib/api-utils';
+import { hasLeadershipRole } from '@/lib/roles';
 
 export async function DELETE(req, { params }) {
   try {
@@ -13,7 +14,7 @@ export async function DELETE(req, { params }) {
 
     const canDelete =
       message.senderId === auth.user.id ||
-      ['admin', 'manager', 'project_manager'].includes(auth.user.role);
+      hasLeadershipRole(auth.user);
 
     if (!canDelete) return error('Forbidden', 403);
 

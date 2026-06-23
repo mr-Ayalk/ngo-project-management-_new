@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from '@/lib/auth';
 import { isValidAvatarValue } from '@/lib/avatar-upload';
 import { PUBLIC_USER_SELECT } from '@/lib/user-public';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
+import { isDean } from '@/lib/roles';
 import { logAudit, getClientIp } from '@/lib/audit';
 
 export async function GET(req) {
@@ -58,8 +59,8 @@ export async function PUT(req) {
     if (body.coreFocus !== undefined) data.coreFocus = String(body.coreFocus).trim() || null;
 
     if (body.email !== undefined) {
-      if (auth.user.role !== 'admin') {
-        return error('Only administrators can change their email address', 403);
+      if (!isDean(auth.user)) {
+        return error('Only the General Country Dean can change their email address', 403);
       }
       const email = String(body.email).trim().toLowerCase();
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

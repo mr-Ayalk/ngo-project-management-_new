@@ -57,12 +57,23 @@ export async function POST(req) {
 
     const stored = await storeUploadedFile(file, { folder: 'uploads' });
 
+    let thumbnailUrl = null;
+    const thumb = formData.get('thumbnail');
+    if (thumb && typeof thumb !== 'string' && thumb.size > 0) {
+      const thumbStored = await storeUploadedFile(thumb, {
+        folder: 'uploads/thumbnails',
+        safeName: `thumb-${Date.now()}.jpg`,
+      });
+      thumbnailUrl = thumbStored.url;
+    }
+
     return json({
       url: stored.url,
       name: file.name,
       size: formatSize(file.size),
       fileType: EXT_TYPES[ext] || ext.toUpperCase() || 'FILE',
       icon: fileIcon(ext),
+      thumbnailUrl,
     });
   } catch (err) {
     console.error('Upload error:', err);

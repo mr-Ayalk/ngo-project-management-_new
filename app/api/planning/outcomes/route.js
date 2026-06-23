@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-utils';
 import { assertProjectAccess } from '@/lib/project-access';
+import { hasLeadershipRole } from '@/lib/roles';
 import { formatOutcome } from '@/lib/planning';
 
 export async function GET(req) {
@@ -18,7 +19,7 @@ export async function GET(req) {
       const ok = await assertProjectAccess(auth.user, projectId);
       if (!ok) return error('Access denied', 403);
       where = { projectId };
-    } else if (!['admin', 'manager', 'project_manager'].includes(auth.user.role)) {
+    } else if (!hasLeadershipRole(auth.user)) {
       const projects = await prisma.project.findMany({
         where: {
           OR: [

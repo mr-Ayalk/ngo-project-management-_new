@@ -10,6 +10,7 @@ import {
   LOCATION_TYPES, formatBudgetInput, parseBudgetInput,
   getTownsForRegion, getZonesForRegion,
 } from '@/lib/ethiopia-locations';
+import { MANAGER_PICKER_ROLES } from '@/lib/roles';
 export const EMPTY_PROJECT_FORM = {
   name: '', description: '', status: 'on-track', icon: 'green',
   budget: '', income: '', startDate: '', endDate: '',
@@ -23,7 +24,7 @@ export const EMPTY_PROJECT_FORM = {
 export default function ProjectFormModal({
   open, form, setForm, users, onSubmit, onClose, submitting, isManager,
 }) {
-  const managerUsers = users.filter((u) => ['admin', 'manager', 'project_manager'].includes(u.role));
+  const managerUsers = users.filter((u) => MANAGER_PICKER_ROLES.includes(u.role));
   const zoneOptions = useMemo(() => getZonesForRegion(form.region), [form.region]);
   const townOptions = useMemo(() => getTownsForRegion(form.region), [form.region]);
 

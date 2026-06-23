@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, requireAuth, requireManager } from '@/lib/api-utils';
+import { hasLeadershipRole } from '@/lib/roles';
 import { REPORT_TYPES } from '@/lib/report-types';
 import { REGIONS } from '@/lib/ethiopia-locations';
 
@@ -39,7 +40,7 @@ export async function GET(req) {
         orderBy: { createdAt: 'desc' },
       }),
       prisma.reportWorkflowRule.findMany({ orderBy: { reportType: 'asc' } }),
-      auth.user.role === 'admin' || ['manager', 'project_manager'].includes(auth.user.role)
+      hasLeadershipRole(auth.user)
         ? prisma.user.findMany({
             where: { isActive: true },
             select: { id: true, name: true, email: true, role: true, staffRole: true },
@@ -54,7 +55,7 @@ export async function GET(req) {
         reportType: t.value,
         reportLabel: t.label,
         submitterRoles: rule?.submitterRoles?.split(',').filter(Boolean) || ['staff', 'field_worker', 'program_staff', 'finance_team'],
-        approverRoles: rule?.approverRoles?.split(',').filter(Boolean) || ['admin', 'manager', 'project_manager'],
+        approverRoles: rule?.approverRoles?.split(',').filter(Boolean) || ['dean', 'project_manager'],
         isActive: rule?.isActive ?? true,
         id: rule?.id || null,
       };

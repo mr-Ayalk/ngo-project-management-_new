@@ -3,11 +3,19 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
-import { assertProjectAccess } from '@/lib/project-access';
+import { assertProjectAccess, assertProjectManageAccess } from '@/lib/project-access';
 
 const COLUMN_MAP = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 
+function formatShort(date) {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function formatTask(t) {
+  const start = formatShort(t.startDate);
+  const end = formatShort(t.endDate || t.dueDate);
+  const dateRange = start && end ? `${start} – ${end}` : end || start || '';
   return {
     id: t.id,
     title: t.title,
@@ -17,10 +25,11 @@ function formatTask(t) {
     priority: t.priority,
     status: t.status,
     column: t.status,
-    dueDate: t.dueDate,
-    date: t.dueDate
-      ? new Date(t.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : '',
+    startDate: t.startDate,
+    endDate: t.endDate,
+    dueDate: t.dueDate || t.endDate,
+    date: dateRange,
+    dateRange,
     assignee: t.assignee ? { id: t.assignee.id, name: t.assignee.name } : null,
     done: t.status === 'completed',
   };
@@ -50,7 +59,7 @@ export async function GET(req) {
         project: { select: { name: true } },
         assignee: { select: { id: true, name: true } },
       },
-      orderBy: { dueDate: 'asc' },
+      orderBy: [{ startDate: 'asc' }, { endDate: 'asc' }],
     });
 
     const columns = {
@@ -84,13 +93,20 @@ export async function POST(req) {
     const body = await parseBody(req);
     if (!body?.title || !body?.projectId) return error('Title and project are required');
 
+    const canManage = await assertProjectManageAccess(auth.user, body.projectId);
+    if (!canManage) return error('You do not have permission to create tasks on this project', 403);
+
+    const endDate = body.endDate || body.dueDate;
+
     const task = await prisma.task.create({
       data: {
         title: body.title,
         description: body.description,
         status: body.status || 'todo',
         priority: body.priority || 'medium',
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        startDate: body.startDate ? new Date(body.startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        dueDate: endDate ? new Date(endDate) : null,
         projectId: body.projectId,
         assigneeId: body.assigneeId || null,
       },

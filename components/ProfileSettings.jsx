@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import toast from '@/lib/toast';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuth } from '@/components/AuthProvider';
-import { getRoleLabel } from '@/lib/roles';
+import { getRoleLabel, isDean } from '@/lib/roles';
 
 const CORE_FOCUS_OPTIONS = [
   'General NGO Operations',
@@ -125,7 +125,7 @@ export default function ProfileSettings() {
         countryScope: countryScope.trim(),
         coreFocus: coreFocus.trim(),
       };
-      if ((profile || user)?.role === 'admin') {
+      if (isDean({ role: (profile || user)?.role })) {
         payload.email = email.trim();
       }
       const data = await api.updateProfile(payload);
@@ -171,7 +171,7 @@ export default function ProfileSettings() {
   const displayUser = profile || user;
   const roleLabel = getRoleLabel(displayUser);
   const roleBadge = roleLabel.toUpperCase();
-  const isAdmin = displayUser?.role === 'admin';
+  const isAdmin = isDean({ role: displayUser?.role });
 
   return (
     <div className="profile-settings-page">

@@ -12,7 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed.js",
-    "db:setup": "prisma migrate deploy && node prisma/seed.js",
+    "db:setup": "prisma migrate deploy && node prisma/seed.js && node scripts/reset-admin-password.js",
     "reset-admin-password": "node scripts/reset-admin-password.js"
   },
   "prisma": {
@@ -26,6 +26,7 @@
     "chart.js": "^4.4.0",
     "jose": "^5.1.0",
     "next": "^14.0.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",

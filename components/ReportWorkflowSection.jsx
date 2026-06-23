@@ -9,12 +9,14 @@ const WORKFLOW_ROLES = [
   { value: 'program_staff', label: 'Program Staff', hint: 'Program officers & coordinators' },
   { value: 'finance_team', label: 'Finance Team', hint: 'Finance & grants staff' },
   { value: 'manager', label: 'Project Manager', hint: 'Managers who oversee projects', aliases: ['project_manager'] },
-  { value: 'admin', label: 'Administrator', hint: 'System administrators' },
+  { value: 'dean', label: 'General Country Dean', hint: 'Ultimate organizational authority', aliases: ['admin'] },
 ];
 
 function expandWorkflowRoles(roles) {
   const set = new Set(roles.filter((r) => r !== 'project_manager'));
   if (set.has('manager')) set.add('project_manager');
+  if (set.has('dean')) set.add('admin');
+  if (set.has('admin')) set.add('dean');
   return [...set];
 }
 
