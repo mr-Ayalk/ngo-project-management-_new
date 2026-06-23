@@ -5,6 +5,7 @@ import { json, error, parseBody, requireAuth, requireManager } from '@/lib/api-u
 import { logActivity } from '@/lib/activity';
 import { formatReport, REPORT_INCLUDE, canEditReport } from '@/lib/reports';
 import { REPORT_TYPES } from '@/lib/report-types';
+import { serializeReportTable, isValidDriveLink } from '@/lib/report-table';
 import { unlink } from 'fs/promises';
 import path from 'path';
 
@@ -56,6 +57,23 @@ export async function PUT(req, { params }) {
     if (body.fileName !== undefined) data.fileName = body.fileName || null;
     if (body.fileType !== undefined) data.fileType = body.fileType || null;
     if (body.fileSize !== undefined) data.fileSize = body.fileSize || null;
+    if (body.activityTable !== undefined) {
+      data.activityTable = Array.isArray(body.activityTable)
+        ? serializeReportTable(body.activityTable)
+        : body.activityTable;
+    }
+    if (body.driveLink !== undefined) {
+      const link = String(body.driveLink || '').trim();
+      if (link && !isValidDriveLink(link)) return error('Invalid Google Drive link URL', 400);
+      data.driveLink = link || null;
+    }
+
+    if (existing.status === 'approved') {
+      data.editedAfterApproval = true;
+      data.editedAfterApprovalAt = new Date();
+    }
+
+    data.updatedAt = new Date();
 
     if (!Object.keys(data).length) return error('No valid fields to update');
 

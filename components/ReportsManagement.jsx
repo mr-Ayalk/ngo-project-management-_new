@@ -149,7 +149,7 @@ export default function ReportsManagement({
             <span>Report Title</span>
             <span>Project</span>
             <span>Submitted By</span>
-            <span>Period / Date</span>
+            <span>Last Updated</span>
             <span>Status</span>
             <span />
           </div>
@@ -159,12 +159,15 @@ export default function ReportsManagement({
                 <span className="ngo-reports-row-icon">{TYPE_ICONS[reportType]}</span>
                 <span>
                   <strong>{report.name}</strong>
+                  {report.editedAfterApproval && (
+                    <small className="report-edited-badge inline">Edited after approved</small>
+                  )}
                   {report.fileName && <small>Attachment: {report.fileName}</small>}
                 </span>
               </span>
               <span>{report.project?.name || 'Organization-wide'}</span>
               <span>{report.submittedBy?.name || '—'}</span>
-              <span>{report.periodLabel || report.date}</span>
+              <span>{report.updatedAtLabel || report.submittedAtLabel || report.date}</span>
               <span><StatusPill status={report.status} label={report.statusLabel} /></span>
               <span className="ngo-reports-row-actions">
                 {isManager && (

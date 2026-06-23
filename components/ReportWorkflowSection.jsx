@@ -4,11 +4,8 @@ import { useState } from 'react';
 import { REPORT_TYPES } from '@/lib/report-types';
 
 const WORKFLOW_ROLES = [
-  { value: 'staff', label: 'Staff', hint: 'General NGO staff' },
-  { value: 'field_worker', label: 'Field Worker', hint: 'Frontline / community staff' },
-  { value: 'program_staff', label: 'Program Staff', hint: 'Program officers & coordinators' },
-  { value: 'finance_team', label: 'Finance Team', hint: 'Finance & grants staff' },
-  { value: 'manager', label: 'Project Manager', hint: 'Managers who oversee projects', aliases: ['project_manager'] },
+  { value: 'staff', label: 'Staff', hint: 'Field and program staff' },
+  { value: 'project_manager', label: 'Project Manager / Lead', hint: 'Leads assigned projects', aliases: ['manager'] },
   { value: 'dean', label: 'General Country Dean', hint: 'Ultimate organizational authority', aliases: ['admin'] },
 ];
 

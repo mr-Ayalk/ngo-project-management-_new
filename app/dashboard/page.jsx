@@ -1,24 +1,24 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Sidebar from '@/components/Sidebar';
 import Topbar from '@/components/Topbar';
 import DashboardPages from '@/components/DashboardPages';
 import api from '@/lib/api';
-
-const SEARCHABLE_PAGES = ['projects', 'beneficiaries'];
+import { getCategoryForPage, NAV_CATEGORIES } from '@/lib/nav-config';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [topbarSearch, setTopbarSearch] = useState('');
   const [pinnedProjects, setPinnedProjects] = useState([]);
   const [pendingNav, setPendingNav] = useState(null);
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+
+  const activeCategory = useMemo(() => getCategoryForPage(currentPage), [currentPage]);
 
   const loadPins = useCallback(async () => {
     try {
@@ -52,13 +52,13 @@ export default function DashboardPage() {
   }, [user, loadPins, loadPendingApprovals]);
 
   const handlePageChange = (page) => {
-    setTopbarSearch('');
     setCurrentPage(page);
     setSidebarOpen(false);
   };
 
-  const handleTopbarSearch = (query) => {
-    setTopbarSearch(query);
+  const handleCategoryChange = (categoryId) => {
+    const cat = NAV_CATEGORIES.find((c) => c.id === categoryId);
+    if (cat) handlePageChange(cat.defaultPage);
   };
 
   const handleOpenPinnedProject = (pin) => {
@@ -98,48 +98,39 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const searchEnabled = SEARCHABLE_PAGES.includes(currentPage);
-
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        pinnedProjects={pinnedProjects}
-        onOpenProject={handleOpenPinnedProject}
-        pendingApprovalCount={pendingApprovalCount}
+    <div className="app-frame">
+      <Topbar
+        onMenuToggle={() => setSidebarOpen((s) => !s)}
+        activeCategory={activeCategory}
+        onCategoryChange={handleCategoryChange}
+        onOpenSettings={handleOpenSettings}
+        onOpenNotification={handleOpenNotification}
       />
-      <div className="main-container">
-        <Topbar
-          onMenuToggle={() => setSidebarOpen((s) => !s)}
-          onSearch={handleTopbarSearch}
-          searchQuery={searchEnabled ? topbarSearch : ''}
-          searchEnabled={searchEnabled}
-          searchPlaceholder={
-            currentPage === 'beneficiaries'
-              ? 'Search beneficiaries...'
-              : currentPage === 'projects'
-                ? 'Search projects...'
-                : 'Search...'
-          }
-          onOpenSettings={handleOpenSettings}
-          onOpenNotification={handleOpenNotification}
-        />
-        <DashboardPages
+      <div className="app-body">
+        <Sidebar
           currentPage={currentPage}
-          onNavigate={handlePageChange}
-          topbarSearch={topbarSearch}
-          onTopbarSearchSync={setTopbarSearch}
+          onPageChange={handlePageChange}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          activeCategory={activeCategory}
           pinnedProjects={pinnedProjects}
-          onPinsChange={loadPins}
-          pendingNav={pendingNav}
-          onPendingNavHandled={() => setPendingNav(null)}
-          onReportsChange={loadPendingApprovals}
+          onOpenProject={handleOpenPinnedProject}
+          pendingApprovalCount={pendingApprovalCount}
         />
+        <div className="main-container">
+          <DashboardPages
+            currentPage={currentPage}
+            onNavigate={handlePageChange}
+            pinnedProjects={pinnedProjects}
+            onPinsChange={loadPins}
+            pendingNav={pendingNav}
+            onPendingNavHandled={() => setPendingNav(null)}
+            onReportsChange={loadPendingApprovals}
+          />
+        </div>
       </div>
-      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
     </div>
   );
 }

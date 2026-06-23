@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { REGIONS, getZonesForRegion } from '@/lib/ethiopia-locations';
-import { STAFF_ROLES } from '@/lib/roles';
+import { ASSIGNABLE_ROLES } from '@/lib/roles';
 import ReportWorkflowSection from '@/components/ReportWorkflowSection';
 
 function ScopeTable({ head, children, empty }) {
@@ -76,9 +76,9 @@ export default function StaffManagementPage({
               <div className="form-row">
                 <div className="form-field"><label>Password *</label><input required type="password" value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} /></div>
                 <div className="form-field">
-                  <label>Staff Role *</label>
-                  <select value={newStaffForm.staffRole} onChange={(e) => setNewStaffForm({ ...newStaffForm, staffRole: e.target.value })}>
-                    {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  <label>Role *</label>
+                  <select value={newStaffForm.role} onChange={(e) => setNewStaffForm({ ...newStaffForm, role: e.target.value })}>
+                    {ASSIGNABLE_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
               </div>

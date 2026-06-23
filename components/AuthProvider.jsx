@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { collectLoginLocation } from '@/lib/login-location';
 
 const AuthContext = createContext(null);
 
@@ -34,7 +35,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const data = await api.login(email, password);
+    const location = await collectLoginLocation().catch(() => ({}));
+    const data = await api.login(email, password, location);
     if (!data?.token) {
       throw new Error('Login failed — no token received');
     }

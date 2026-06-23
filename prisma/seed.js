@@ -180,13 +180,13 @@ async function main() {
     }),
     prisma.reportWorkflowRule.createMany({
       data: [
-        { reportType: 'daily', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'dean,project_manager' },
-        { reportType: 'weekly', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'dean,project_manager' },
-        { reportType: 'monthly', submitterRoles: 'program_staff,finance_team', approverRoles: 'dean,project_manager' },
-        { reportType: 'quarterly', submitterRoles: 'program_staff,finance_team', approverRoles: 'dean,project_manager' },
-        { reportType: 'biannual', submitterRoles: 'program_staff,finance_team', approverRoles: 'dean' },
-        { reportType: 'annual', submitterRoles: 'program_staff,finance_team', approverRoles: 'dean' },
-        { reportType: 'incident', submitterRoles: 'staff,field_worker,program_staff', approverRoles: 'dean,project_manager' },
+        { reportType: 'daily', submitterRoles: 'staff,project_manager', approverRoles: 'dean,project_manager' },
+        { reportType: 'weekly', submitterRoles: 'staff,project_manager', approverRoles: 'dean,project_manager' },
+        { reportType: 'monthly', submitterRoles: 'staff,project_manager', approverRoles: 'dean,project_manager' },
+        { reportType: 'quarterly', submitterRoles: 'staff,project_manager', approverRoles: 'dean,project_manager' },
+        { reportType: 'biannual', submitterRoles: 'staff,project_manager', approverRoles: 'dean' },
+        { reportType: 'annual', submitterRoles: 'staff,project_manager', approverRoles: 'dean' },
+        { reportType: 'incident', submitterRoles: 'staff,project_manager', approverRoles: 'dean,project_manager' },
       ],
     }),
     prisma.userScopeMapping.create({

@@ -26,7 +26,12 @@ import ProjectFormModal, { EMPTY_PROJECT_FORM, parseBudgetInput } from '@/compon
 import ProjectIcon from '@/components/ProjectIcon';
 import TaskDetailView from '@/components/TaskDetailView';
 import { useAuth } from '@/components/AuthProvider';
-import { isDean, isProjectManager, canManageUsers, canCreateProjects, userLeadsProject, ASSIGNABLE_ROLES, STAFF_ROLES, MANAGER_PICKER_ROLES } from '@/lib/roles';
+import { isDean, isProjectManager, canManageUsers, canCreateProjects, canManageBudget, userLeadsProject, ASSIGNABLE_ROLES, MANAGER_PICKER_ROLES, getRoleLabel } from '@/lib/roles';
+import { defaultReportTableRows, parseReportTable } from '@/lib/report-table';
+import { budgetBarClass } from '@/lib/budget-colors';
+import ReportActivityTable from '@/components/ReportActivityTable';
+import ReportPlanComparison from '@/components/ReportPlanComparison';
+import UserAvatar from '@/components/UserAvatar';
 import { resolveDocumentThumbnail } from '@/lib/pdf-thumbnail';
 import { formatBudgetInput } from '@/lib/ethiopia-locations';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -59,6 +64,8 @@ const EMPTY_REPORT = {
   incidentSeverity: '',
   incidentLocation: '',
   actionsTaken: '',
+  driveLink: '',
+  activityTable: defaultReportTableRows(3),
 };
 
 const KANBAN_COLS = [
@@ -177,7 +184,7 @@ const DashboardPages = ({
     dateFormat: 'DD/MM/YYYY', timezone: 'Africa/Addis_Ababa', fiscalYearStart: 'July',
   });
   const [selectedTask, setSelectedTask] = useState(null);
-  const [newStaffForm, setNewStaffForm] = useState({ name: '', email: '', password: '', staffRole: 'field_worker' });
+  const [newStaffForm, setNewStaffForm] = useState({ name: '', email: '', password: '', role: 'staff' });
   const [isPinned, setIsPinned] = useState(false);
 
   const [calYear, setCalYear] = useState(new Date().getFullYear());
@@ -197,6 +204,8 @@ const DashboardPages = ({
   const [reportFile, setReportFile] = useState(null);
   const reportFileInputRef = useRef(null);
   const [viewReport, setViewReport] = useState(null);
+  const [reportPlanData, setReportPlanData] = useState(null);
+  const [approvalPlanData, setApprovalPlanData] = useState({});
   const [rejectForm, setRejectForm] = useState({ reportId: null, reason: '', requestRevision: true });
   const [viewDocument, setViewDocument] = useState(null);
   const [editUser, setEditUser] = useState(null);
@@ -264,9 +273,22 @@ const DashboardPages = ({
         case 'reports-overview':
           setReportsDashboard(await api.reportsDashboard());
           break;
-        case 'reports-approval':
-          setTypedReports(await api.reports({ pending: 'true' }));
+        case 'reports-approval': {
+          const pendingReports = await api.reports({ pending: 'true' });
+          setTypedReports(pendingReports);
+          const planPairs = await Promise.all(
+            pendingReports.slice(0, 15).map(async (r) => {
+              try {
+                const plan = await api.reportPlanComparison(r.id);
+                return [r.id, plan];
+              } catch {
+                return [r.id, null];
+              }
+            }),
+          );
+          setApprovalPlanData(Object.fromEntries(planPairs));
           break;
+        }
         case 'reports-daily':
         case 'reports-weekly':
         case 'reports-monthly':
@@ -726,9 +748,9 @@ const DashboardPages = ({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.createUser({ ...newStaffForm, role: 'staff' });
+      await api.createUser(newStaffForm);
       showToast('Staff member added');
-      setNewStaffForm({ name: '', email: '', password: '', staffRole: 'field_worker' });
+      setNewStaffForm({ name: '', email: '', password: '', role: 'staff' });
       loadPageData(false);
     } catch (err) {
       showToast(err.message, 'error');
@@ -1288,7 +1310,7 @@ const DashboardPages = ({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.updateUser({ id: editUser.id, name: editUser.name, role: editUser.role, staffRole: editUser.staffRole, isActive: editUser.isActive });
+      await api.updateUser({ id: editUser.id, name: editUser.name, role: editUser.role, isActive: editUser.isActive });
       showToast('User updated');
       closeModal();
       loadPageData();
@@ -1338,10 +1360,38 @@ const DashboardPages = ({
     try {
       const full = await api.report(report.id);
       setViewReport(full);
+      try {
+        const plan = await api.reportPlanComparison(report.id);
+        setReportPlanData(plan);
+      } catch {
+        setReportPlanData(null);
+      }
     } catch {
       setViewReport(report);
+      setReportPlanData(null);
     }
     setModal('reportView');
+  };
+
+  const openEditReport = (report) => {
+    setReportForm({
+      id: report.id,
+      name: report.name,
+      type: report.type,
+      description: report.description || '',
+      content: report.content || '',
+      reportDate: report.reportDate ? new Date(report.reportDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      periodStart: report.periodStart ? new Date(report.periodStart).toISOString().slice(0, 10) : '',
+      periodEnd: report.periodEnd ? new Date(report.periodEnd).toISOString().slice(0, 10) : '',
+      projectId: report.projectId || report.project?.id || '',
+      incidentSeverity: report.incidentSeverity || '',
+      incidentLocation: report.incidentLocation || '',
+      actionsTaken: report.actionsTaken || '',
+      driveLink: report.driveLink || '',
+      activityTable: parseReportTable(report.activityTable),
+    });
+    setReportFile(null);
+    setModal('report');
   };
 
   const openActivities = async () => {
@@ -1452,17 +1502,84 @@ const DashboardPages = ({
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
         <>
-          <div className="page-header page-header-row">
-            <div>
-              <h1>Welcome, {firstName}</h1>
-              <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <div className="dash-hero">
+            <div className="dash-hero-main">
+              <h1>Welcome back, {firstName}!</h1>
+              <p>
+                Manage your humanitarian programs, track impact, and collaborate with your team — all in one secure workspace.
+              </p>
+              <div className="dash-hero-actions">
+                {canCreateProjects(user) && (
+                  <button type="button" className="dash-hero-btn primary" onClick={() => openProjectModal()}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Project
+                  </button>
+                )}
+                <button type="button" className="dash-hero-btn" onClick={() => onNavigate?.('projects')}>Projects</button>
+                <button type="button" className="dash-hero-btn" onClick={() => onNavigate?.('messages')}>Messages</button>
+                <button type="button" className="dash-hero-btn" onClick={() => onNavigate?.('reports-daily')}>Reports</button>
+                <button type="button" className="dash-hero-btn" onClick={() => onNavigate?.('calendar')}>Calendar</button>
+              </div>
             </div>
-            {canCreateProjects(user) && (
-              <button type="button" className="btn-primary" onClick={() => openProjectModal()}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                New Project
+            <div className="dash-hero-stats">
+              <div className="dash-hero-stat">
+                <span className="dash-hero-stat-val">{dashboard.kpis.activeProjects}</span>
+                <span className="dash-hero-stat-label">Active Projects</span>
+              </div>
+              <div className="dash-hero-stat">
+                <span className="dash-hero-stat-val">{dashboard.kpis.tasksCompleted}</span>
+                <span className="dash-hero-stat-label">Tasks Done</span>
+              </div>
+              <div className="dash-hero-stat">
+                <span className="dash-hero-stat-val">{dashboard.kpis.budgetUtilizedPct}%</span>
+                <span className="dash-hero-stat-label">Budget Used</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="dash-profile-row">
+            <div className="dash-profile-card">
+              <UserAvatar user={user} size="xl" />
+              <div className="dash-profile-name">{user?.name}</div>
+              <div className="dash-profile-role">{getRoleLabel(user)}</div>
+              <div className="dash-profile-meta">
+                <div className="dash-profile-meta-item">
+                  <span>Email</span>
+                  <span>{user?.email || '—'}</span>
+                </div>
+                <div className="dash-profile-meta-item">
+                  <span>Today</span>
+                  <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                </div>
+                <div className="dash-profile-meta-item">
+                  <span>Beneficiaries</span>
+                  <span>{dashboard.kpis.totalBeneficiaries.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+            <div className="dash-quick-grid">
+              <button type="button" className="dash-quick-card" onClick={() => onNavigate?.('projects')}>
+                <div className="dash-quick-card-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="20" height="20"><path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                </div>
+                <h3>Projects</h3>
+                <p>Track programs, tasks, and team progress across all initiatives.</p>
               </button>
-            )}
+              <button type="button" className="dash-quick-card" onClick={() => onNavigate?.('beneficiaries')}>
+                <div className="dash-quick-card-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="20" height="20"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                <h3>Beneficiaries</h3>
+                <p>Manage beneficiary records and community impact data.</p>
+              </button>
+              <button type="button" className="dash-quick-card" onClick={() => onNavigate?.('budget')}>
+                <div className="dash-quick-card-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                </div>
+                <h3>Budget</h3>
+                <p>Monitor spending, allocations, and donor compliance.</p>
+              </button>
+            </div>
           </div>
 
           <div className="page-header">
@@ -1572,7 +1689,7 @@ const DashboardPages = ({
                 <div key={i} className="budget-item" style={{ cursor: 'pointer' }} onClick={() => onNavigate?.('budget')}>
                   <div className="budget-row"><span className="budget-name">{item.name}</span><span className="budget-pct">{item.pct}%</span></div>
                   <div className="budget-vals">{item.amount} / {item.total}</div>
-                  <div className="bar-track"><div className={`bar-fill${item.amber ? ' amber' : ''}${item.red ? ' red' : ''}`} style={{ width: `${item.pct}%` }}></div></div>
+                  <div className="bar-track"><div className={`bar-fill${budgetBarClass(item.pct) ? ` ${budgetBarClass(item.pct)}` : ''}`} style={{ width: `${item.pct}%` }}></div></div>
                 </div>
               ))}
             </div>
@@ -1720,7 +1837,7 @@ const DashboardPages = ({
                   <div className="project-detail-section-title">Team Members</div>
                   <div className="team-chips">
                     {projectDetail.members.map((m) => (
-                      <span key={m.id} className="team-chip">{m.name} <small>({m.staffRole || m.role})</small></span>
+                      <span key={m.id} className="team-chip">{m.name} <small>({getRoleLabel({ role: m.role, staffRole: m.staffRole })})</small></span>
                     ))}
                   </div>
                 </div>
@@ -1787,7 +1904,7 @@ const DashboardPages = ({
                     <span>{b.category}</span>
                     <span style={{ color: 'var(--gray-500)' }}>{b.spent} / {b.allocated}</span>
                   </div>
-                  <div className="bar-track"><div className="bar-fill" style={{ width: `${b.pct}%` }}></div></div>
+                  <div className="bar-track"><div className={`bar-fill${budgetBarClass(b.pct) ? ` ${budgetBarClass(b.pct)}` : ''}`} style={{ width: `${b.pct}%` }}></div></div>
                 </div>
               ))}
             </div>
@@ -1916,7 +2033,7 @@ const DashboardPages = ({
               <h1>Budget</h1>
               <p>Track spending and utilization across active projects.</p>
             </div>
-            {(isManager || user?.staffRole === 'finance_team') && (
+            {canManageBudget(user) && (
               <button className="btn-primary" onClick={async () => { const data = await loadLookup(); setExpenseForm({ ...EMPTY_EXPENSE, projectId: data.projects[0]?.id || '' }); setModal('expense'); }}>+ Add Expense</button>
             )}
           </div>
@@ -1930,7 +2047,7 @@ const DashboardPages = ({
             {budget.projects.map((proj) => (
               <div key={proj.id} className="budget-list-row" style={{ cursor: 'pointer' }} onClick={() => { setExpenseForm({ projectId: proj.id, amount: '', category: 'operations' }); setModal('expense'); }}>
                 <span className="budget-list-name">{proj.name}</span>
-                <div className="budget-list-bar"><div className="budget-list-pcts"><span>{proj.spent} spent</span><span>{proj.total} total</span></div><div className="bar-track"><div className={`bar-fill${proj.amber ? ' amber' : ''}${proj.red ? ' red' : ''}`} style={{ width: `${proj.pct}%` }}></div></div></div>
+                <div className="budget-list-bar"><div className="budget-list-pcts"><span>{proj.spent} spent</span><span>{proj.total} total</span></div><div className="bar-track"><div className={`bar-fill${budgetBarClass(proj.pct) ? ` ${budgetBarClass(proj.pct)}` : ''}`} style={{ width: `${proj.pct}%` }}></div></div></div>
                 <span className="budget-list-amt">{proj.pct}%</span>
               </div>
             ))}
@@ -1966,6 +2083,7 @@ const DashboardPages = ({
         <ReportsApproval
           reports={typedReports}
           loading={loading && !typedReports.length}
+          planDataByReportId={approvalPlanData}
           onOpenReport={openReportDetail}
           onApprove={handleApproveReport}
           onReject={(report) => {
@@ -2150,7 +2268,7 @@ const DashboardPages = ({
       )}
 
       {/* ── HELP ── */}
-      {currentPage === 'help' && <UserGuidePage />}
+      {currentPage === 'help' && <UserGuidePage onNavigate={onNavigate} />}
 
       {/* ── AUDIT LOG ── */}
       {currentPage === 'audit-log' && (
@@ -2420,6 +2538,19 @@ const DashboardPages = ({
               <textarea rows={3} value={reportForm.actionsTaken} onChange={(e) => setReportForm({ ...reportForm, actionsTaken: e.target.value })} placeholder="Immediate actions, referrals, follow-up plan…" />
             </div>
           )}
+          <ReportActivityTable
+            rows={reportForm.activityTable || []}
+            onChange={(rows) => setReportForm({ ...reportForm, activityTable: rows })}
+          />
+          <div className="form-field">
+            <label>Google Drive Link (optional)</label>
+            <input
+              type="url"
+              value={reportForm.driveLink || ''}
+              onChange={(e) => setReportForm({ ...reportForm, driveLink: e.target.value })}
+              placeholder="https://drive.google.com/..."
+            />
+          </div>
           <div className="form-field">
             <label>Attach File (optional)</label>
             <input ref={reportFileInputRef} type="file" className="file-input-hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.png,.jpg,.jpeg" onChange={(e) => handleReportFileSelect(e.target.files?.[0])} />
@@ -2442,12 +2573,17 @@ const DashboardPages = ({
         </form>
       </Modal>
 
-      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal} width={760}>
+      <Modal open={modal === 'reportView'} title={viewReport?.name || 'Report'} onClose={closeModal} width={920}>
         {viewReport && (<>
           <div className="ngo-report-view-meta">
             <span className={`ngo-report-status status-${viewReport.status}`}>{viewReport.statusLabel || viewReport.status}</span>
+            {viewReport.editedAfterApproval && (
+              <span className="report-edited-badge">{viewReport.editedAfterApprovalLabel || 'Edited after approved'}</span>
+            )}
             <span>{viewReport.typeLabel || viewReport.type}</span>
-            <span>{viewReport.date}</span>
+            <span>Reported: {viewReport.date}</span>
+            {viewReport.submittedAtLabel && <span>Submitted: {viewReport.submittedAtLabel}</span>}
+            {viewReport.updatedAtLabel && <span>Updated: {viewReport.updatedAtLabel}</span>}
             {viewReport.project?.name && <span>Project: {viewReport.project.name}</span>}
           </div>
           {viewReport.periodLabel && <p className="detail-meta">Reporting period: {viewReport.periodLabel}</p>}
@@ -2463,6 +2599,15 @@ const DashboardPages = ({
               <div className="report-detail-content">{viewReport.content || viewReport.actionsTaken}</div>
             </div>
           )}
+          {viewReport.activityTable?.length > 0 && (
+            <ReportActivityTable rows={viewReport.activityTable} readOnly />
+          )}
+          {isManager && ['submitted', 'pending_approval', 'approved'].includes(viewReport.status) && (
+            <ReportPlanComparison
+              planData={reportPlanData}
+              activityRows={viewReport.activityTable || reportPlanData?.activityRows || []}
+            />
+          )}
           {viewReport.rejectionReason && (
             <div className="ngo-report-rejection-note">
               <strong>Reviewer feedback:</strong> {viewReport.rejectionReason}
@@ -2473,9 +2618,16 @@ const DashboardPages = ({
               <strong>Attachment:</strong> {viewReport.fileName} {viewReport.fileSize ? `(${viewReport.fileSize})` : ''}
             </p>
           )}
+          {viewReport.driveLink && (
+            <p className="detail-meta report-attachment">
+              <strong>Google Drive:</strong>{' '}
+              <a href={viewReport.driveLink} target="_blank" rel="noopener noreferrer">{viewReport.driveLink}</a>
+            </p>
+          )}
           <div className="report-actions">
             <button type="button" onClick={() => downloadReport(viewReport)}>Download{viewReport.fileUrl ? ' File' : ''}</button>
             <button type="button" onClick={() => shareReport(viewReport)}>Share</button>
+            <button type="button" className="btn-secondary" onClick={() => openEditReport(viewReport)}>Edit Report</button>
             {['draft', 'revision_requested', 'rejected'].includes(viewReport.status) && (
               <button type="button" className="btn-primary" onClick={() => handleSubmitReport(viewReport.id)} disabled={submitting}>Submit for Approval</button>
             )}
@@ -2532,14 +2684,6 @@ const DashboardPages = ({
                 {ASSIGNABLE_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
-            {editUser.role === 'staff' && canManageUsers(user) && (
-              <div className="form-field">
-                <label>Staff Type</label>
-                <select value={editUser.staffRole || 'program_staff'} onChange={(e) => setEditUser({ ...editUser, staffRole: e.target.value })}>
-                  {STAFF_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-            )}
             <div className="form-field"><label><input type="checkbox" checked={editUser.isActive} onChange={(e) => setEditUser({ ...editUser, isActive: e.target.checked })} /> Active</label></div>
             <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Save</button></div>
           </form>

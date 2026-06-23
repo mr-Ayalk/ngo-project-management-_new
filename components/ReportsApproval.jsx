@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { getReportTypeMeta } from '@/lib/report-types';
-import { TYPE_ICONS } from '@/components/ReportsManagement';
+import ReportPlanComparison from '@/components/ReportPlanComparison';
 
 function StatusPill({ status, label }) {
   return <span className={`ngo-report-status status-${status}`}>{label}</span>;
@@ -14,6 +14,7 @@ export default function ReportsApproval({
   onOpenReport,
   onApprove,
   onReject,
+  planDataByReportId = {},
 }) {
   const [typeFilter, setTypeFilter] = useState('all');
 
@@ -79,9 +80,14 @@ export default function ReportsApproval({
                 <span className="ngo-reports-row-icon">{TYPE_ICONS[report.type]}</span>
                 <div>
                   <h3>{report.name}</h3>
-                  <p>{getReportTypeMeta(report.type).label} · {report.submittedBy?.name || 'Unknown'} · {report.date}</p>
+                  <p>{getReportTypeMeta(report.type).label} · {report.submittedBy?.name || 'Unknown'} · Updated {report.updatedAtLabel || report.date}</p>
                 </div>
-                <StatusPill status={report.status} label={report.statusLabel} />
+                <div className="ngo-approval-badges">
+                  <StatusPill status={report.status} label={report.statusLabel} />
+                  {report.editedAfterApproval && (
+                    <span className="report-edited-badge">Edited after approved</span>
+                  )}
+                </div>
               </div>
               {(report.description || report.content) && (
                 <p className="ngo-reports-approval-preview">
@@ -94,6 +100,10 @@ export default function ReportsApproval({
                 {report.periodLabel && <span>Period: {report.periodLabel}</span>}
                 {report.incidentSeverity && <span>Severity: {report.incidentSeverity}</span>}
               </div>
+              <ReportPlanComparison
+                planData={planDataByReportId[report.id]}
+                activityRows={report.activityTable || planDataByReportId[report.id]?.activityRows || []}
+              />
               <div className="ngo-reports-approval-actions">
                 <button type="button" className="btn-secondary" onClick={() => onOpenReport?.(report)}>Review Details</button>
                 <button type="button" className="btn-primary" onClick={() => onApprove?.(report)}>Approve</button>

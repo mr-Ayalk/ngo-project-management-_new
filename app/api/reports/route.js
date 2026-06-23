@@ -5,7 +5,7 @@ import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
 import { logActivity } from '@/lib/activity';
 import { formatReport, REPORT_INCLUDE, notifyReportApprovers } from '@/lib/reports';
 import { REPORT_TYPES } from '@/lib/report-types';
-import { isProjectManager } from '@/lib/roles';
+import { serializeReportTable, isValidDriveLink } from '@/lib/report-table';
 
 const VALID_TYPES = REPORT_TYPES.map((t) => t.value);
 
@@ -48,6 +48,9 @@ export async function POST(req) {
     if (body.type && !VALID_TYPES.includes(body.type)) return error('Invalid report type');
 
     const status = body.submit ? 'pending_approval' : 'draft';
+    const now = new Date();
+    const driveLink = String(body.driveLink || '').trim();
+    if (driveLink && !isValidDriveLink(driveLink)) return error('Invalid Google Drive link URL', 400);
 
     const report = await prisma.report.create({
       data: {
@@ -56,12 +59,12 @@ export async function POST(req) {
         status,
         description: body.description?.trim() || null,
         content: body.content?.trim() || null,
-        reportDate: body.reportDate ? new Date(body.reportDate) : new Date(),
+        reportDate: body.reportDate ? new Date(body.reportDate) : now,
         periodStart: body.periodStart ? new Date(body.periodStart) : null,
         periodEnd: body.periodEnd ? new Date(body.periodEnd) : null,
         projectId: body.projectId || null,
         submittedById: user.id,
-        submittedAt: body.submit ? new Date() : null,
+        submittedAt: body.submit ? now : null,
         incidentSeverity: body.incidentSeverity || null,
         incidentLocation: body.incidentLocation?.trim() || null,
         actionsTaken: body.actionsTaken?.trim() || null,
@@ -69,6 +72,11 @@ export async function POST(req) {
         fileName: body.fileName || null,
         fileType: body.fileType || null,
         fileSize: body.fileSize || null,
+        activityTable: body.activityTable
+          ? (Array.isArray(body.activityTable) ? serializeReportTable(body.activityTable) : body.activityTable)
+          : null,
+        driveLink: driveLink || null,
+        updatedAt: now,
       },
       include: REPORT_INCLUDE,
     });

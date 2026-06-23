@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import prisma from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { json, error, parseBody, requireAuth } from '@/lib/api-utils';
-import { isProjectManager, formatUserRole } from '@/lib/roles';
+import { isProjectManager, formatUserRole, ASSIGNABLE_ROLES } from '@/lib/roles';
 import { logAudit, getClientIp } from '@/lib/audit';
 
 export async function GET(req) {
@@ -48,14 +48,19 @@ export async function POST(req) {
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
     if (existing) return error('Email already registered', 409);
 
+    const role = body.role || 'staff';
+    if (!ASSIGNABLE_ROLES.some((r) => r.value === role)) {
+      return error('Invalid role. Use dean, project_manager, or staff.', 400);
+    }
+
     const hashedPassword = await hashPassword(body.password);
     const user = await prisma.user.create({
       data: {
         email: body.email,
         name: body.name,
         password: hashedPassword,
-        role: body.role || 'staff',
-        staffRole: body.staffRole || 'program_staff',
+        role,
+        staffRole: null,
       },
       select: { id: true, name: true, email: true, role: true, staffRole: true, isActive: true },
     });
@@ -93,8 +98,13 @@ export async function PUT(req) {
 
     const data = {};
     if (body.name) data.name = body.name;
-    if (body.role && isProjectManager(caller)) data.role = body.role;
-    if (body.staffRole !== undefined && isProjectManager(caller)) data.staffRole = body.staffRole;
+    if (body.role && isProjectManager(caller)) {
+      if (!ASSIGNABLE_ROLES.some((r) => r.value === body.role)) {
+        return error('Invalid role', 400);
+      }
+      data.role = body.role;
+      data.staffRole = null;
+    }
     if (body.isActive !== undefined && isProjectManager(caller)) data.isActive = body.isActive;
 
     const user = await prisma.user.update({

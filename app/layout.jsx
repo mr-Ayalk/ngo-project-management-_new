@@ -1,6 +1,7 @@
 import './globals.css';
 import './design-system.css';
 import './ui-premium.css';
+import './app-shell.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import AppToaster from '@/components/AppToaster';

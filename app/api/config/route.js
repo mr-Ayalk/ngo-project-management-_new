@@ -54,7 +54,7 @@ export async function GET(req) {
       return {
         reportType: t.value,
         reportLabel: t.label,
-        submitterRoles: rule?.submitterRoles?.split(',').filter(Boolean) || ['staff', 'field_worker', 'program_staff', 'finance_team'],
+        submitterRoles: rule?.submitterRoles?.split(',').filter(Boolean) || ['staff', 'project_manager'],
         approverRoles: rule?.approverRoles?.split(',').filter(Boolean) || ['dean', 'project_manager'],
         isActive: rule?.isActive ?? true,
         id: rule?.id || null,

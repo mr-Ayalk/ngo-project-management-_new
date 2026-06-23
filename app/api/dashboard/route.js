@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import prisma from '@/lib/db';
 import { json, error, formatCurrency, timeAgo, getInitials, AVATAR_COLORS, requireAuth } from '@/lib/api-utils';
+import { budgetBarClass } from '@/lib/budget-colors';
 
 function parseJsonArray(value, fallback = []) {
   if (!value) return fallback;
@@ -100,14 +101,19 @@ export async function GET(req) {
       include: { project: { select: { name: true } } },
     });
 
-    const budgetOverview = projects.slice(0, 4).map((p) => ({
-      name: p.name.replace(' Project', '').replace(' Initiative', ' Init.'),
-      amount: formatCurrency(p.spent),
-      total: formatCurrency(p.budget),
-      pct: p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0,
-      amber: p.status === 'at-risk',
-      red: p.status === 'delayed',
-    }));
+    const budgetOverview = projects.slice(0, 4).map((p) => {
+      const pct = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
+      const barClass = budgetBarClass(pct);
+      return {
+        name: p.name.replace(' Project', '').replace(' Initiative', ' Init.'),
+        amount: formatCurrency(p.spent),
+        total: formatCurrency(p.budget),
+        pct,
+        amber: barClass === 'amber',
+        red: barClass === 'red',
+        green: !barClass,
+      };
+    });
 
     const chartLabels = [];
     const chartTasksCompleted = [];

@@ -3,10 +3,12 @@ export const dynamic = 'force-dynamic';
 import { verifyPassword, signJWT } from '@/lib/auth';
 import prisma from '@/lib/db';
 import { toPublicUser } from '@/lib/user-public';
+import { getClientIp } from '@/lib/audit';
 
 export async function POST(req) {
   try {
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const { email, password, location } = body || {};
     if (!email || !password) {
       return Response.json({ error: 'Missing credentials' }, { status: 400 });
     }
@@ -22,9 +24,25 @@ export async function POST(req) {
     if (!ok) return Response.json({ error: 'Invalid credentials' }, { status: 401 });
 
     const token = await signJWT({ id: user.id, email: user.email, name: user.name, role: user.role });
+    const ipAddress = getClientIp(req);
+    const userAgent = req.headers.get('user-agent') || null;
 
-    // update lastLogin
-    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+    await Promise.all([
+      prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
+      prisma.loginEvent.create({
+        data: {
+          userId: user.id,
+          ipAddress,
+          city: location?.city || null,
+          region: location?.region || null,
+          country: location?.country || null,
+          latitude: location?.latitude != null ? Number(location.latitude) : null,
+          longitude: location?.longitude != null ? Number(location.longitude) : null,
+          timezone: location?.timezone || null,
+          userAgent,
+        },
+      }).catch((err) => console.warn('LoginEvent create failed:', err)),
+    ]);
 
     return Response.json({
       token,
