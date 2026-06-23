@@ -848,8 +848,9 @@ canvas {
 
 .table-head {
   display: grid;
-  grid-template-columns: 2fr 100px 120px 90px 100px 40px;
-  padding: 10px 16px;
+  grid-template-columns: 2fr minmax(110px, 1fr) minmax(140px, 1fr) minmax(100px, 1fr) minmax(120px, 1fr) 48px;
+  column-gap: 20px;
+  padding: 12px 24px;
   background: var(--gray-50);
   border-bottom: 1px solid var(--gray-200);
 }
@@ -864,8 +865,9 @@ canvas {
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 100px 120px 90px 100px 40px;
-  padding: 12px 16px;
+  grid-template-columns: 2fr minmax(110px, 1fr) minmax(140px, 1fr) minmax(100px, 1fr) minmax(120px, 1fr) 48px;
+  column-gap: 20px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--gray-100);
   align-items: center;
   cursor: pointer;
@@ -1432,6 +1434,13 @@ body { background: var(--bg); color: var(--text); }
 .cal-event.blue {
   background: var(--blue-light);
   color: var(--blue);
+}
+
+.cal-event.overdue {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-weight: 600;
 }
 
 .upcoming-events {
@@ -3442,8 +3451,9 @@ canvas {
 
 .project-detail-overview {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px 28px;
+  margin-bottom: 24px;
 }
 
 .project-detail-stat {

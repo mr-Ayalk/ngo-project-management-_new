@@ -15,6 +15,14 @@ export async function GET(req) {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 0, 23, 59, 59);
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const toLocalDay = (date) => {
+      const d = new Date(date);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
+
     const events = await prisma.calendarEvent.findMany({
       where: { date: { gte: start, lte: end } },
       include: { project: { select: { name: true } } },
@@ -27,9 +35,16 @@ export async function GET(req) {
 
     const eventsByDay = {};
     events.forEach((e) => {
-      const day = new Date(e.date).getDate();
+      const eventDay = toLocalDay(e.date);
+      const day = eventDay.getDate();
+      const isOverdue = eventDay < todayStart;
       if (!eventsByDay[day]) eventsByDay[day] = [];
-      eventsByDay[day].push({ t: e.title, c: e.color, id: e.id });
+      eventsByDay[day].push({
+        t: e.title,
+        c: isOverdue ? 'overdue' : e.color,
+        id: e.id,
+        overdue: isOverdue,
+      });
     });
 
     const days = [];
@@ -49,11 +64,8 @@ export async function GET(req) {
       days.push({ num: d, otherMonth: true });
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
     const upcoming = events
-      .filter((e) => new Date(e.date) >= todayStart)
+      .filter((e) => toLocalDay(e.date) >= todayStart)
       .slice(0, 6)
       .map((e) => {
         const d = new Date(e.date);
@@ -83,7 +95,7 @@ export async function GET(req) {
 
     const overdue = [
       ...overdueEvents.map((e) => {
-        const d = new Date(e.date);
+        const d = toLocalDay(e.date);
         return {
           id: e.id,
           title: e.title,
@@ -94,7 +106,7 @@ export async function GET(req) {
         };
       }),
       ...overdueTasks.map((t) => {
-        const d = new Date(t.dueDate);
+        const d = toLocalDay(t.dueDate);
         return {
           id: t.id,
           title: t.title,

@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [pageHistory, setPageHistory] = useState(['dashboard']);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pinnedProjects, setPinnedProjects] = useState([]);
   const [pendingNav, setPendingNav] = useState(null);
@@ -51,10 +52,29 @@ export default function DashboardPage() {
     }
   }, [user, loadPins, loadPendingApprovals]);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
+  const handlePageChange = useCallback((page) => {
     setSidebarOpen(false);
-  };
+    setPageHistory((prev) => {
+      if (prev[prev.length - 1] === page) {
+        setCurrentPage(page);
+        return prev;
+      }
+      setCurrentPage(page);
+      return [...prev, page];
+    });
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setPageHistory((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.slice(0, -1);
+      setCurrentPage(next[next.length - 1]);
+      return next;
+    });
+    setSidebarOpen(false);
+  }, []);
+
+  const canGoBack = pageHistory.length > 1;
 
   const handleCategoryChange = (categoryId) => {
     const cat = NAV_CATEGORIES.find((c) => c.id === categoryId);
@@ -62,28 +82,27 @@ export default function DashboardPage() {
   };
 
   const handleOpenPinnedProject = (pin) => {
-    setCurrentPage('projects');
+    handlePageChange('projects');
     setPendingNav({ projectId: pin.projectId, tab: pin.tab || 'overview' });
-    setSidebarOpen(false);
   };
 
   const handleOpenSettings = () => {
-    setCurrentPage('settings');
+    handlePageChange('settings');
   };
 
   const handleOpenNotification = (notif) => {
     if (notif.linkType === 'reports_approval' || notif.type === 'report_approval') {
-      setCurrentPage('reports-approval');
+      handlePageChange('reports-approval');
       return;
     }
     if (notif.projectId) {
-      setCurrentPage('messages');
+      handlePageChange('messages');
       setPendingNav({
         projectId: notif.projectId,
         openMessages: true,
       });
     } else {
-      setCurrentPage('messages');
+      handlePageChange('messages');
     }
   };
 
@@ -122,6 +141,8 @@ export default function DashboardPage() {
           <DashboardPages
             currentPage={currentPage}
             onNavigate={handlePageChange}
+            onBack={handleBack}
+            canGoBack={canGoBack}
             pinnedProjects={pinnedProjects}
             onPinsChange={loadPins}
             pendingNav={pendingNav}

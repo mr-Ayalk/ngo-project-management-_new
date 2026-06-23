@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import Modal from '@/components/Modal';
 import AutocompleteInput from '@/components/AutocompleteInput';
+import SearchableSelect from '@/components/SearchableSelect';
 import LocationMap from '@/components/LocationMap';
 import TeamMemberSelect from '@/components/TeamMemberSelect';
 import {
@@ -14,7 +15,7 @@ import { MANAGER_PICKER_ROLES } from '@/lib/roles';
 export const EMPTY_PROJECT_FORM = {
   name: '', description: '', status: 'on-track', icon: 'green',
   budget: '', income: '', startDate: '', endDate: '',
-  donor: '', donorName: '', managerId: '', leadId: '',
+  donor: '', donorName: '', managerId: '',
   assumptions: '', risks: '', indicators: '', outcomes: '',
   mitigationStrategies: '', locationType: '',
   region: '', zone: '', town: '', kebele: '', woreda: '',
@@ -105,21 +106,14 @@ export default function ProjectFormModal({
 
         <div className="project-form-section">
           <h4 className="form-section-title">Team Assignment</h4>
-          <div className="form-row">
-            <div className="form-field">
-              <label>Project Manager *</label>
-              <select required value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })}>
-                {managerUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label>Project Lead</label>
-              <select value={form.leadId || ''} onChange={(e) => setForm({ ...form, leadId: e.target.value })}>
-                <option value="">Same as Manager</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            </div>
-          </div>
+          <SearchableSelect
+            label="Project Manager"
+            required
+            value={form.managerId}
+            onChange={(managerId) => setForm({ ...form, managerId })}
+            options={managerUsers.map((u) => ({ value: u.id, label: u.name }))}
+            placeholder="Type to search managers…"
+          />
           <div className="form-field">
             <label>Team Members</label>
             <TeamMemberSelect

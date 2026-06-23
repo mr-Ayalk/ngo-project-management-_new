@@ -19,6 +19,8 @@ import SettingsAdminPanel from '@/components/SettingsAdminPanel';
 import ProjectLogframePanel from '@/components/ProjectLogframePanel';
 import AuditLogPage from '@/components/AuditLogPage';
 import UserGuidePage from '@/components/UserGuidePage';
+import PageBackNav from '@/components/PageBackNav';
+import SearchableSelect from '@/components/SearchableSelect';
 import ProjectLocationMap from '@/components/ProjectLocationMap';
 import { reportTypeFromPageId, getReportTypeMeta, INCIDENT_SEVERITIES } from '@/lib/report-types';
 import { isConfigPage } from '@/lib/config-pages';
@@ -122,7 +124,7 @@ function KanbanBoard({ tasks, draggedTask, dropTarget, onDragStart, onDragOver, 
 const DOC_CATEGORIES = ['all', 'reports', 'budget', 'data', 'contracts', 'media', 'training', 'feedback'];
 
 const DashboardPages = ({
-  currentPage, onNavigate,
+  currentPage, onNavigate, onBack, canGoBack,
   topbarSearch = '',
   onTopbarSearchSync,
   pinnedProjects = [], onPinsChange, pendingNav, onPendingNavHandled,
@@ -626,7 +628,6 @@ const DashboardPages = ({
         donor: detail.donor || '',
         donorName: detail.donorName || detail.donor || '',
         managerId: detail.managerId || detail.manager?.id || defaultManager?.id || '',
-        leadId: detail.leadId || '',
         assumptions: detail.assumptions || '',
         risks: detail.risks || '',
         indicators: detail.indicators || '',
@@ -642,7 +643,7 @@ const DashboardPages = ({
         memberIds: detail.members?.map((m) => m.id) || [],
       });
     } else {
-      setProjectForm({ ...EMPTY_PROJECT, managerId: defaultManager?.id || '', leadId: defaultManager?.id || '' });
+      setProjectForm({ ...EMPTY_PROJECT, managerId: defaultManager?.id || '' });
     }
     setModal('project');
   };
@@ -693,7 +694,7 @@ const DashboardPages = ({
         donor: projectForm.donorName || projectForm.donor,
         donorName: projectForm.donorName || projectForm.donor,
         managerId: projectForm.managerId,
-        leadId: projectForm.leadId || projectForm.managerId,
+        leadId: projectForm.managerId,
         assumptions: projectForm.assumptions,
         risks: projectForm.risks,
         indicators: projectForm.indicators,
@@ -1498,16 +1499,21 @@ const DashboardPages = ({
   return (
     <div className="content" onClick={() => setMenuOpen(null)}>
       {refreshing && <div className="refresh-bar" aria-hidden="true" />}
+      {canGoBack && currentPage !== 'dashboard' && (
+        <PageBackNav onBack={onBack} />
+      )}
 
       {/* ── DASHBOARD ── */}
       {currentPage === 'dashboard' && dashboard && (
         <>
           <div className="dash-hero">
-            <div className="dash-hero-main">
-              <h1>Welcome back, {firstName}!</h1>
-              <p>
-                Manage your humanitarian programs, track impact, and collaborate with your team — all in one secure workspace.
-              </p>
+            <div className="dash-hero-top">
+              <div className="dash-hero-main">
+                <h1>Welcome back, {firstName}!</h1>
+                <p>
+                  Manage your humanitarian programs, track impact, and collaborate with your team — all in one secure workspace.
+                </p>
+              </div>
               <div className="dash-hero-actions">
                 {canCreateProjects(user) && (
                   <button type="button" className="dash-hero-btn primary" onClick={() => openProjectModal()}>
@@ -1812,8 +1818,7 @@ const DashboardPages = ({
             <>
               <div className="project-detail-overview">
                 <div className="project-detail-stat"><label>Status</label><span><span className={`status-badge ${selectedProject.status}`}><span className="status-dot"></span>{statusLabel(selectedProject.status)}</span></span></div>
-                <div className="project-detail-stat"><label>Manager</label><span>{projectDetail.manager}</span></div>
-                <div className="project-detail-stat"><label>Project Lead</label><span>{projectDetail.lead || projectDetail.manager}</span></div>
+                <div className="project-detail-stat"><label>Project Manager</label><span>{projectDetail.manager}</span></div>
                 <div className="project-detail-stat"><label>Donor</label><span>{projectDetail.donorName || '—'}</span></div>
                 <div className="project-detail-stat"><label>Progress</label><span>{selectedProject.progress}%</span></div>
                 <div className="project-detail-stat"><label>Budget</label><span>{projectDetail.spent} / {selectedProject.budget}</span></div>
@@ -1964,7 +1969,9 @@ const DashboardPages = ({
                   >
                     <div className="cal-day-num">{day.num}</div>
                     <div className="cal-day-events">
-                      {day.events?.map((evt, j) => (<div key={j} className={`cal-event ${evt.c}`}>{evt.t}</div>))}
+                      {day.events?.map((evt, j) => (
+                        <div key={j} className={`cal-event ${evt.overdue ? 'overdue' : evt.c}`} title={evt.overdue ? 'Overdue' : ''}>{evt.t}</div>
+                      ))}
                     </div>
                   </div>
                   );
@@ -2363,11 +2370,28 @@ const DashboardPages = ({
           <div className="form-field"><label>Title *</label><input required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} /></div>
           <div className="form-row">
             <div className="form-field"><label>Date *</label><input type="date" required min={new Date().toISOString().slice(0, 10)} value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} /></div>
-            <div className="form-field"><label>Color</label><select value={eventForm.color} onChange={(e) => setEventForm({ ...eventForm, color: e.target.value })}><option value="green">Green</option><option value="red">Red</option><option value="amber">Amber</option><option value="blue">Blue</option></select></div>
+            <SearchableSelect
+              label="Color"
+              value={eventForm.color}
+              onChange={(color) => setEventForm({ ...eventForm, color })}
+              options={[
+                { value: 'green', label: 'Green' },
+                { value: 'red', label: 'Red' },
+                { value: 'amber', label: 'Amber' },
+                { value: 'blue', label: 'Blue' },
+              ]}
+              placeholder="Search or pick a color…"
+            />
           </div>
           <div className="form-field"><label><input type="checkbox" checked={eventForm.allDay} onChange={(e) => setEventForm({ ...eventForm, allDay: e.target.checked })} /> All Day</label></div>
           {!eventForm.allDay && <div className="form-field"><label>Time</label><input type="time" value={eventForm.time} onChange={(e) => setEventForm({ ...eventForm, time: e.target.value })} /></div>}
-          <div className="form-field"><label>Project (optional)</label><select value={eventForm.projectId} onChange={(e) => setEventForm({ ...eventForm, projectId: e.target.value })}><option value="">None</option>{lookup.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <SearchableSelect
+            label="Project (optional)"
+            value={eventForm.projectId}
+            onChange={(projectId) => setEventForm({ ...eventForm, projectId })}
+            options={[{ value: '', label: 'None' }, ...lookup.projects.map((p) => ({ value: p.id, label: p.name }))]}
+            placeholder="Type to search projects…"
+          />
           <div className="form-actions"><button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button><button type="submit" className="btn-primary" disabled={submitting}>Add Event</button></div>
         </form>
       </Modal>
